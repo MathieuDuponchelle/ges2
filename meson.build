@@ -6,8 +6,11 @@ extra_libs = []
 glib_dep = dependency('glib-2.0')
 gobject_dep = dependency('gobject-2.0')
 gst_dep = dependency('gstreamer-1.0', version: '>= 1.5')
+gst_player_dep = dependency('gstreamer-player')
 
-inc = include_directories ('nle')
+inc = include_directories ('nle', 'ges')
 
 subdir('nle')
+subdir('ges')
+subdir('gst-plugins')
 subdir('tests')

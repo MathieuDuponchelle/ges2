@@ -1,7 +1,10 @@
 #include <stdio.h>
 #include <gst/gst.h>
+#include <gst/player/gstplayer.h>
 
 #include "nle.h"
+
+#include "ges-clip.h"
 
 struct _elements_entry
 {
@@ -35,11 +38,20 @@ setup (void) {
 
 int main (int ac, char **av)
 {
-  GstElement *composition;
-
   if (!setup())
     return 1;
 
-  composition = gst_element_factory_make ("nlecomposition", "mycompo");
-  printf ("lol bitch : %" GST_PTR_FORMAT "\n", composition);
+  gchar *uri;
+  GMainLoop *loop = g_main_loop_new (NULL, FALSE);
+  GstPlayer *player = gst_player_new();
+  GESClip *clip = ges_clip_new ("file:///home/meh/Videos/homeland.mp4");
+  nle_object_commit (NLE_OBJECT(ges_clip_get_nleobject (clip)), TRUE);
+
+  uri = g_strdup_printf ("ges:///%p\n", (void *) clip);
+  gst_player_set_uri (player, uri);
+  gst_player_play (player);
+
+  g_main_loop_run (loop);
+
+  g_object_unref (clip);
 }
