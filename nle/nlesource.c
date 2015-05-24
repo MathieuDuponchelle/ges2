@@ -477,17 +477,17 @@ nle_source_prepare (NleObject * object)
   }
 
   if (object->in_composition == FALSE) {
-    gst_element_send_event (GST_ELEMENT_CAST (parent),
+    gst_element_send_event (GST_ELEMENT_CAST (object),
         gst_event_new_seek (1.0, GST_FORMAT_TIME,
             GST_SEEK_FLAG_ACCURATE | GST_SEEK_FLAG_FLUSH,
-            GST_SEEK_TYPE_SET, object->start, GST_SEEK_TYPE_SET, object->stop));
+            GST_SEEK_TYPE_SET, object->inpoint, GST_SEEK_TYPE_SET, object->stop + object->inpoint));
   }
 
   GST_LOG_OBJECT (source, "srcpad:%p, dynamicpads:%d",
       object->srcpad, priv->dynamicpads);
 
   if (!priv->staticpad && !(get_valid_src_pad (source, source->element, &pad))) {
-    GST_DEBUG_OBJECT (source, "Couldn't find a valid source pad");
+    GST_ERROR_OBJECT (source, "Couldn't find a valid source pad");
   } else {
     if (priv->staticpad)
       pad = gst_object_ref (priv->staticpad);

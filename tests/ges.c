@@ -44,7 +44,7 @@ int main (int ac, char **av)
   gchar *uri;
   GMainLoop *loop = g_main_loop_new (NULL, FALSE);
   GstPlayer *player = gst_player_new();
-  GESClip *clip = ges_clip_new ("file:///home/meh/Videos/homeland.mp4");
+  GESClip *clip = ges_clip_new ("file:///home/meh/Videos/homeland.mp4", FALSE);
   nle_object_commit (NLE_OBJECT(ges_clip_get_nleobject (clip)), TRUE);
 
   uri = g_strdup_printf ("ges:///%p\n", (void *) clip);

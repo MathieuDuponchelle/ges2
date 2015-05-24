@@ -10,7 +10,7 @@ G_BEGIN_DECLS
 
 G_DECLARE_FINAL_TYPE(GESClip, ges_clip, GES, CLIP, GstElement)
 
-GESClip *ges_clip_new (const gchar *uri);
+GESClip *ges_clip_new (const gchar *uri, gboolean as_video);
 GstElement * ges_clip_get_nleobject (GESClip *self);
 
 G_END_DECLS
