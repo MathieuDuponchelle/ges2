@@ -1,5 +1,7 @@
 project('GStreamer-Editing-Services', 'c')
+
 add_global_arguments('-std=c99', language : 'c')
+
 extra_libs = []
 glib_dep = dependency('glib-2.0')
 gobject_dep = dependency('gobject-2.0')
