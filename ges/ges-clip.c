@@ -5,7 +5,7 @@
 typedef struct _GESClipPrivate
 {
   gchar *uri;
-  gboolean as_video;
+  GESMediaType media_type;
   GstElement *nleobject;
 } GESClipPrivate;
 
@@ -19,6 +19,12 @@ G_DEFINE_TYPE (GESClip, ges_clip, GST_TYPE_ELEMENT)
 
 /* API */
 
+GESMediaType
+ges_clip_get_media_type (GESClip *self)
+{
+  return self->priv->media_type;
+}
+
 void
 ges_clip_set_uri (GESClip *self, const gchar *uri)
 {
@@ -26,9 +32,9 @@ ges_clip_set_uri (GESClip *self, const gchar *uri)
 }
 
 GESClip *
-ges_clip_new (const gchar *uri, gboolean as_video)
+ges_clip_new (const gchar *uri, GESMediaType media_type)
 {
-  return g_object_new (GES_TYPE_CLIP, "uri", uri, "as-video", as_video, NULL);
+  return g_object_new (GES_TYPE_CLIP, "uri", uri, "media-type", media_type, NULL);
 }
 
 GstElement *
@@ -43,7 +49,7 @@ enum
 {
   PROP_0,
   PROP_URI,
-  PROP_AS_VIDEO,
+  PROP_MEDIA_TYPE,
 };
 
 static void
@@ -56,8 +62,8 @@ _set_property (GObject * object, guint property_id,
     case PROP_URI:
       ges_clip_set_uri (self, g_value_get_string (value));
       break;
-    case PROP_AS_VIDEO:
-      self->priv->as_video = g_value_get_boolean (value);
+    case PROP_MEDIA_TYPE:
+      self->priv->media_type = g_value_get_flags (value);
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
@@ -74,8 +80,8 @@ _get_property (GObject * object, guint property_id,
     case PROP_URI:
       g_value_set_string (value, priv->uri);
       break;
-    case PROP_AS_VIDEO:
-      g_value_set_boolean (value, priv->as_video);
+    case PROP_MEDIA_TYPE:
+      g_value_set_flags (value, priv->media_type);
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
@@ -97,11 +103,12 @@ _make_nle_object (GESClip *self)
   GstElement *topbin;
   GstPad *srcpad, *ghost;
 
-  topbin = gst_bin_new ("mybin");
-  if (self->priv->as_video)
+  topbin = gst_bin_new (NULL);
+  if (self->priv->media_type == GES_MEDIA_TYPE_VIDEO)
     rate = gst_element_factory_make ("videorate", NULL);
   else
     rate = gst_element_factory_make ("audiorate", NULL);
+
   decodebin = gst_element_factory_make ("uridecodebin", NULL);
   gst_bin_add_many (GST_BIN(topbin), decodebin, rate, NULL); 
 
@@ -118,11 +125,11 @@ _make_nle_object (GESClip *self)
 
   self->priv->nleobject = gst_element_factory_make ("nlesource", NULL);
 
-  if (self->priv->as_video)
-    g_object_set (decodebin, "caps", gst_caps_from_string ("video/x-raw"),
+  if (self->priv->media_type == GES_MEDIA_TYPE_VIDEO)
+    g_object_set (decodebin, "caps", gst_caps_from_string (GES_RAW_VIDEO_CAPS),
         "expose-all-streams", FALSE, "uri", self->priv->uri, NULL);
   else
-    g_object_set (decodebin, "caps", gst_caps_from_string ("audio/x-raw"),
+    g_object_set (decodebin, "caps", gst_caps_from_string (GES_RAW_AUDIO_CAPS),
         "expose-all-streams", FALSE, "uri", self->priv->uri, NULL);
 
   if (!gst_bin_add (GST_BIN (self->priv->nleobject), topbin))
@@ -154,8 +161,8 @@ ges_clip_class_init (GESClipClass *klass)
       g_param_spec_string ("uri", "URI", "uri of the resource", NULL,
           G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 
-  g_object_class_install_property (g_object_class, PROP_AS_VIDEO,
-      g_param_spec_boolean ("as-video", "As Video", "stupid flag", TRUE,
+  g_object_class_install_property (g_object_class, PROP_MEDIA_TYPE,
+      g_param_spec_flags ("media-type", "Media Type", "media type", GES_TYPE_MEDIA_TYPE, GES_MEDIA_TYPE_UNKNOWN,
           G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 }
 

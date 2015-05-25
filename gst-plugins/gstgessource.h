@@ -27,6 +27,7 @@
 #include <gst/gst.h>
 
 #include "ges-clip.h"
+#include "ges-timeline.h"
 
 G_BEGIN_DECLS
 

@@ -43,7 +43,7 @@ GST_DEBUG_CATEGORY_STATIC (gstgessource);
 
 struct _GstGesSource {
   GstBin parent;
-  GESClip *clip;
+  GstElement *clip;
 };
 
 enum
@@ -74,10 +74,10 @@ gst_ges_source_set_clip (GstGesSource * self, GESClip * clip)
     return FALSE;
   }
 
-  self->clip = clip;
+  self->clip = GST_ELEMENT (clip);
 
   nleobject = ges_clip_get_nleobject(clip);
-  gst_bin_add (sbin, nleobject);
+  GST_ERROR ("added clip :%d", gst_bin_add (sbin, nleobject));
   {
     GstPad *gpad;
     GstPad *pad = gst_element_get_static_pad (nleobject, "src");
@@ -88,6 +88,76 @@ gst_ges_source_set_clip (GstGesSource * self, GESClip * clip)
     gst_element_add_pad (GST_ELEMENT (self), gpad);
   }
 
+  return TRUE;
+}
+
+static gboolean
+videopad_query_function (GstPad * pad, GstObject * parent,
+    GstQuery * query)
+{
+  gboolean ret = TRUE;
+
+  switch GST_QUERY_TYPE (query) {
+    case GST_QUERY_CAPS:
+      gst_query_set_caps_result (query, gst_caps_from_string ("video/x-raw"));
+      GST_ERROR ("we got our caps queried");
+      break;
+    default:
+      ret = gst_pad_query_default (pad, parent, query);
+      break;
+  }
+
+  return ret;
+}
+
+static gboolean
+gst_ges_source_set_timeline (GstGesSource * self, GESTimeline *timeline)
+{
+  GstBin *sbin = GST_BIN (self);
+  GstIterator *pads;
+  gboolean done = FALSE;
+  GValue paditem = { 0, };
+
+  if (self->clip) {
+    GST_FIXME_OBJECT (self, "Implement changing clip support");
+
+    return FALSE;
+  }
+
+  self->clip = GST_ELEMENT (timeline);
+
+  pads = gst_element_iterate_src_pads (GST_ELEMENT (timeline));
+
+  gst_bin_add (sbin, GST_ELEMENT (timeline));
+
+  while (!done) {
+    switch (gst_iterator_next (pads, &paditem)) {
+      case GST_ITERATOR_OK:
+      {
+        GstPad *gpad;
+        GstPad *pad = g_value_get_object (&paditem);
+
+        GST_ERROR_OBJECT (pad, "adding pad to bin : %s", gst_caps_to_string(gst_pad_query_caps (pad, NULL)));
+        gpad = gst_ghost_pad_new (NULL, pad);
+
+        gst_pad_set_active (gpad, TRUE);
+        gst_element_add_pad (GST_ELEMENT (self), gpad);
+        g_value_reset (&paditem);
+      }
+        break;
+      case GST_ITERATOR_DONE:
+      case GST_ITERATOR_ERROR:
+        done = TRUE;
+        break;
+      case GST_ITERATOR_RESYNC:
+        gst_iterator_resync (pads);
+        break;
+    }
+  }
+  g_value_reset (&paditem);
+  gst_iterator_free (pads);
+
+  gst_element_no_more_pads (GST_ELEMENT (self));
   return TRUE;
 }
 
@@ -124,7 +194,10 @@ gst_ges_source_uri_set_uri (GstURIHandler * handler, const gchar * uri,
 
   ptr = (void *) g_ascii_strtoull (uri + 7, NULL, 16);
   GST_ERROR ("pointer is : %p", ptr);
-  gst_ges_source_set_clip (GST_GES_SOURCE (handler), GES_CLIP (ptr));
+  if (GES_IS_CLIP (ptr))
+    gst_ges_source_set_clip (GST_GES_SOURCE (handler), GES_CLIP (ptr));
+  else if (GES_IS_TIMELINE (ptr))
+    gst_ges_source_set_timeline (GST_GES_SOURCE (handler), GES_TIMELINE (ptr));
   return TRUE;
 }
 
@@ -187,7 +260,7 @@ gst_ges_source_class_init (GstGesSourceClass * self_class)
    */
   properties[PROP_CLIP] = g_param_spec_object ("clip", "Clip",
       "Clip to use in this source.",
-      GES_TYPE_CLIP, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS);
+      GST_TYPE_ELEMENT, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS);
 
   g_object_class_install_properties (gclass, PROP_LAST, properties);
 
