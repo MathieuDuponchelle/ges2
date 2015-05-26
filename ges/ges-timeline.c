@@ -9,6 +9,7 @@ typedef struct _GESTimelinePrivate
   GList *nleobjects;
   guint expected_async_done;
   guint group_id;
+  GESMediaType media_type;
 } GESTimelinePrivate;
 
 struct _GESTimeline
@@ -105,6 +106,30 @@ _ghost_srcpad (GESTimeline *self, GstElement *element)
 }
 
 static void
+_add_expandable_operation (GstElement *composition, const gchar *element_name, guint priority)
+{
+  GstElement *expandable = gst_element_factory_make ("nleoperation", NULL);
+  GstElement *element = gst_element_factory_make (element_name, NULL);
+
+  gst_bin_add (GST_BIN (expandable), element);
+
+  g_object_set (expandable, "expandable", TRUE, "priority", priority, NULL);
+  gst_bin_add (GST_BIN (composition), expandable);
+}
+
+static void
+_add_expandable_source (GstElement *composition, const gchar *element_name, guint priority)
+{
+  GstElement *expandable = gst_element_factory_make ("nlesource", NULL);
+  GstElement *element = gst_element_factory_make (element_name, NULL);
+
+  gst_bin_add (GST_BIN (expandable), element);
+
+  g_object_set (expandable, "expandable", TRUE, "priority", priority, NULL);
+  gst_bin_add (GST_BIN (composition), expandable);
+}
+
+static GstElement *
 _create_composition (GESTimeline *self, const gchar *caps_string, const gchar *name)
 {
   GstElement *composition = gst_element_factory_make ("nlecomposition", name);
@@ -118,13 +143,27 @@ _create_composition (GESTimeline *self, const gchar *caps_string, const gchar *n
 
   self->priv->nleobjects = g_list_append (self->priv->nleobjects, composition);
   _ghost_srcpad (self, capsfilter);
+
+  return composition;
 }
 
 static void
 _make_nle_objects (GESTimeline *self)
 {
-  _create_composition (self, GES_RAW_AUDIO_CAPS, "audio-composition");
-  _create_composition (self, GES_RAW_VIDEO_CAPS, "video-composition");
+  GstElement *composition;
+
+  if (self->priv->media_type & GES_MEDIA_TYPE_AUDIO) {
+    composition = _create_composition (self, GES_RAW_AUDIO_CAPS, "audio-composition");
+    _add_expandable_operation (composition, "audiomixer", 0);
+    _add_expandable_source (composition, "audiotestsrc", 1);
+  }
+
+  if (self->priv->media_type & GES_MEDIA_TYPE_VIDEO) {
+    composition = _create_composition (self, GES_RAW_VIDEO_CAPS, "video-composition");
+    _add_expandable_operation (composition, "compositor", 0);
+    _add_expandable_source (composition, "videotestsrc", 1);
+  }
+
   gst_element_no_more_pads (GST_ELEMENT (self));
 }
 
@@ -192,16 +231,20 @@ gboolean
 ges_timeline_add_clip (GESTimeline *self, GESClip *clip)
 {
   GstElement *composition = _get_first_composition (self, ges_clip_get_media_type (clip));
+  GstElement *nleobject;
 
   if (!composition)
     return FALSE;
-  return gst_bin_add (GST_BIN (composition), ges_clip_get_nleobject (clip));
+
+  nleobject = ges_clip_get_nleobject (clip);
+  g_object_set (nleobject, "priority", 2, NULL);
+  return gst_bin_add (GST_BIN (composition), nleobject);
 }
 
 GESTimeline *
-ges_timeline_new (void)
+ges_timeline_new (GESMediaType media_type)
 {
-  return g_object_new (GES_TYPE_TIMELINE, NULL);
+  return g_object_new (GES_TYPE_TIMELINE, "media-type", media_type, NULL);
 }
 
 GList *
@@ -232,6 +275,7 @@ GList *ges_timeline_get_compositions_by_media_type (GESTimeline *self, GESMediaT
 enum
 {
   PROP_0,
+  PROP_MEDIA_TYPE,
 };
 
 static void
@@ -239,13 +283,29 @@ _set_property (GObject * object, guint property_id,
     const GValue * value, GParamSpec * pspec)
 {
   GESTimeline *self = GES_TIMELINE (object);
-  (void) self;
+
+  switch (property_id) {
+    case PROP_MEDIA_TYPE:
+      self->priv->media_type = g_value_get_flags (value);
+      break;
+    default:
+      G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
+  }
 }
 
 static void
 _get_property (GObject * object, guint property_id,
     GValue * value, GParamSpec * pspec)
 {
+  GESTimelinePrivate *priv = GES_TIMELINE (object)->priv;
+
+  switch (property_id) {
+    case PROP_MEDIA_TYPE:
+      g_value_set_flags (value, priv->media_type);
+      break;
+    default:
+      G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
+  }
 }
 
 static void
@@ -267,6 +327,11 @@ ges_timeline_class_init (GESTimelineClass *klass)
   g_object_class->set_property = _set_property;
   g_object_class->get_property = _get_property;
   g_object_class->constructed = _constructed;
+
+  g_object_class_install_property (g_object_class, PROP_MEDIA_TYPE,
+      g_param_spec_flags ("media-type", "Media Type", "media type",
+        GES_TYPE_MEDIA_TYPE, GES_MEDIA_TYPE_AUDIO | GES_MEDIA_TYPE_VIDEO,
+          G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 
   bin_class->handle_message = GST_DEBUG_FUNCPTR (ges_timeline_handle_message);
 }

@@ -14,7 +14,7 @@ G_BEGIN_DECLS
 
 G_DECLARE_FINAL_TYPE(GESTimeline, ges_timeline, GES, TIMELINE, GstBin)
 
-GESTimeline *ges_timeline_new (void);
+GESTimeline *ges_timeline_new (GESMediaType media_type);
 gboolean ges_timeline_add_clip (GESTimeline *self, GESClip *clip);
 gboolean ges_timeline_commit (GESTimeline *timeline);
 GList *ges_timeline_get_compositions_by_media_type (GESTimeline *timeline, GESMediaType media_type);

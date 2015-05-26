@@ -1,4 +1,5 @@
 #include "ges-clip.h"
+#include "ges-editable.h"
 
 /* Structure definitions */
 
@@ -15,7 +16,10 @@ struct _GESClip
   GESClipPrivate *priv;
 };
 
-G_DEFINE_TYPE (GESClip, ges_clip, GST_TYPE_ELEMENT)
+static void ges_editable_interface_init (GESEditableInterface * iface);
+
+G_DEFINE_TYPE_WITH_CODE (GESClip, ges_clip, GST_TYPE_ELEMENT,
+    G_IMPLEMENT_INTERFACE (GES_TYPE_EDITABLE, ges_editable_interface_init))
 
 /* API */
 
@@ -41,6 +45,46 @@ GstElement *
 ges_clip_get_nleobject (GESClip *self)
 {
   return self->priv->nleobject;
+}
+
+/* Interface implementation */
+
+static gboolean
+_set_inpoint (GESEditable *editable, GstClockTime inpoint)
+{
+  GESClip *clip = GES_CLIP (editable);
+
+  g_object_set (clip->priv->nleobject, "inpoint", inpoint, NULL);
+
+  return TRUE;
+}
+
+static gboolean
+_set_duration (GESEditable *editable, GstClockTime duration)
+{
+  GESClip *clip = GES_CLIP (editable);
+
+  g_object_set (clip->priv->nleobject, "duration", duration, NULL);
+
+  return TRUE;
+}
+
+static gboolean
+_set_start (GESEditable *editable, GstClockTime start)
+{
+  GESClip *clip = GES_CLIP (editable);
+
+  g_object_set (clip->priv->nleobject, "start", start, NULL);
+
+  return TRUE;
+}
+
+static void
+ges_editable_interface_init (GESEditableInterface * iface)
+{
+  iface->set_inpoint = _set_inpoint;
+  iface->set_duration = _set_duration;
+  iface->set_start = _set_start;
 }
 
 /* GObject initialization */
@@ -99,22 +143,30 @@ _pad_added_cb (GstElement *element, GstPad *srcpad, GstPad *sinkpad)
 static void
 _make_nle_object (GESClip *self)
 {
-  GstElement *decodebin, *rate;
+  GstElement *decodebin, *rate, *converter;
   GstElement *topbin;
   GstPad *srcpad, *ghost;
 
   topbin = gst_bin_new (NULL);
-  if (self->priv->media_type == GES_MEDIA_TYPE_VIDEO)
-    rate = gst_element_factory_make ("videorate", NULL);
-  else
-    rate = gst_element_factory_make ("audiorate", NULL);
-
   decodebin = gst_element_factory_make ("uridecodebin", NULL);
-  gst_bin_add_many (GST_BIN(topbin), decodebin, rate, NULL); 
+
+  if (self->priv->media_type == GES_MEDIA_TYPE_VIDEO) {
+    converter = gst_element_factory_make ("videoconvert", NULL);
+    rate = gst_element_factory_make ("videorate", NULL);
+    gst_bin_add_many (GST_BIN(topbin), decodebin, converter, rate, NULL); 
+    gst_element_link (converter, rate);
+  } else {
+    converter = gst_element_factory_make ("audioconvert", NULL);
+    rate = gst_element_factory_make ("audioresample", NULL);
+    gst_bin_add_many (GST_BIN(topbin), decodebin, converter, rate, NULL); 
+    gst_element_link (converter, rate);
+  }
+
 
   g_signal_connect (decodebin, "pad-added",
       G_CALLBACK (_pad_added_cb),
-      gst_element_get_static_pad (rate, "sink"));
+      gst_element_get_static_pad (converter, "sink"));
+
 
   srcpad = gst_element_get_static_pad (rate, "src");
   ghost = gst_ghost_pad_new ("src", srcpad);
@@ -134,8 +186,6 @@ _make_nle_object (GESClip *self)
 
   if (!gst_bin_add (GST_BIN (self->priv->nleobject), topbin))
     return;
-
-  g_object_set (self->priv->nleobject, "duration", 2 * GST_SECOND, "inpoint", 50 * GST_SECOND, NULL);
 }
 
 static void
