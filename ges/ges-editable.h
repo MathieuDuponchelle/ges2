@@ -3,6 +3,7 @@
 
 #include <glib-object.h>
 #include <gst/gst.h>
+#include <ges.h>
 
 G_BEGIN_DECLS
 
@@ -17,11 +18,15 @@ struct _GESEditableInterface
   gboolean (*set_inpoint) (GESEditable *self, GstClockTime inpoint);
   gboolean (*set_duration) (GESEditable *self, GstClockTime duration);
   gboolean (*set_start) (GESEditable *self, GstClockTime start);
+  GList *  (*get_nle_objects) (GESEditable *self);
+
+  GESMediaType media_type;
 };
 
 gboolean ges_editable_set_inpoint (GESEditable *editable, GstClockTime inpoint);
 gboolean ges_editable_set_duration (GESEditable *editable, GstClockTime duration);
 gboolean ges_editable_set_start (GESEditable *editable, GstClockTime start);
+GList *  ges_editable_get_nle_objects (GESEditable *editable);
 
 G_END_DECLS
 

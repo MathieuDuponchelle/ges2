@@ -79,12 +79,77 @@ _set_start (GESEditable *editable, GstClockTime start)
   return TRUE;
 }
 
+static GList *
+_get_nle_objects (GESEditable *editable)
+{
+  return g_list_append (NULL, GES_CLIP (editable)->priv->nleobject);
+}
+
 static void
 ges_editable_interface_init (GESEditableInterface * iface)
 {
   iface->set_inpoint = _set_inpoint;
   iface->set_duration = _set_duration;
   iface->set_start = _set_start;
+  iface->get_nle_objects = _get_nle_objects;
+}
+
+/* Implementation */
+
+static void
+_pad_added_cb (GstElement *element, GstPad *srcpad, GstPad *sinkpad)
+{
+  gst_element_no_more_pads (element);
+  gst_pad_link (srcpad, sinkpad);
+  gst_object_unref (sinkpad);
+}
+
+static void
+_make_nle_object (GESClip *self)
+{
+  GstElement *decodebin, *rate, *converter;
+  GstElement *topbin;
+  GstPad *srcpad, *ghost;
+
+  topbin = gst_bin_new (NULL);
+  decodebin = gst_element_factory_make ("uridecodebin", NULL);
+
+  self->priv->nleobject = gst_element_factory_make ("nlesource", NULL);
+
+  if (self->priv->media_type == GES_MEDIA_TYPE_VIDEO) {
+    converter = gst_element_factory_make ("videoconvert", NULL);
+    rate = gst_element_factory_make ("videorate", NULL);
+    gst_bin_add_many (GST_BIN(topbin), decodebin, converter, rate, NULL); 
+    gst_element_link (converter, rate);
+    g_object_set (self->priv->nleobject, "caps", gst_caps_from_string(GES_RAW_VIDEO_CAPS), NULL);
+  } else {
+    converter = gst_element_factory_make ("audioconvert", NULL);
+    rate = gst_element_factory_make ("audioresample", NULL);
+    gst_bin_add_many (GST_BIN(topbin), decodebin, converter, rate, NULL); 
+    gst_element_link (converter, rate);
+    g_object_set (self->priv->nleobject, "caps", gst_caps_from_string(GES_RAW_AUDIO_CAPS), NULL);
+  }
+
+  g_signal_connect (decodebin, "pad-added",
+      G_CALLBACK (_pad_added_cb),
+      gst_element_get_static_pad (converter, "sink"));
+
+  srcpad = gst_element_get_static_pad (rate, "src");
+  ghost = gst_ghost_pad_new ("src", srcpad);
+  gst_pad_set_active (ghost, TRUE);
+  gst_element_add_pad (topbin, ghost);
+
+  gst_object_unref (srcpad);
+
+  if (self->priv->media_type == GES_MEDIA_TYPE_VIDEO)
+    g_object_set (decodebin, "caps", gst_caps_from_string (GES_RAW_VIDEO_CAPS),
+        "expose-all-streams", FALSE, "uri", self->priv->uri, NULL);
+  else
+    g_object_set (decodebin, "caps", gst_caps_from_string (GES_RAW_AUDIO_CAPS),
+        "expose-all-streams", FALSE, "uri", self->priv->uri, NULL);
+
+  if (!gst_bin_add (GST_BIN (self->priv->nleobject), topbin))
+    return;
 }
 
 /* GObject initialization */
@@ -108,6 +173,7 @@ _set_property (GObject * object, guint property_id,
       break;
     case PROP_MEDIA_TYPE:
       self->priv->media_type = g_value_get_flags (value);
+      _make_nle_object (self);
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
@@ -133,70 +199,6 @@ _get_property (GObject * object, guint property_id,
 }
 
 static void
-_pad_added_cb (GstElement *element, GstPad *srcpad, GstPad *sinkpad)
-{
-  gst_element_no_more_pads (element);
-  gst_pad_link (srcpad, sinkpad);
-  gst_object_unref (sinkpad);
-}
-
-static void
-_make_nle_object (GESClip *self)
-{
-  GstElement *decodebin, *rate, *converter;
-  GstElement *topbin;
-  GstPad *srcpad, *ghost;
-
-  topbin = gst_bin_new (NULL);
-  decodebin = gst_element_factory_make ("uridecodebin", NULL);
-
-  if (self->priv->media_type == GES_MEDIA_TYPE_VIDEO) {
-    converter = gst_element_factory_make ("videoconvert", NULL);
-    rate = gst_element_factory_make ("videorate", NULL);
-    gst_bin_add_many (GST_BIN(topbin), decodebin, converter, rate, NULL); 
-    gst_element_link (converter, rate);
-  } else {
-    converter = gst_element_factory_make ("audioconvert", NULL);
-    rate = gst_element_factory_make ("audioresample", NULL);
-    gst_bin_add_many (GST_BIN(topbin), decodebin, converter, rate, NULL); 
-    gst_element_link (converter, rate);
-  }
-
-
-  g_signal_connect (decodebin, "pad-added",
-      G_CALLBACK (_pad_added_cb),
-      gst_element_get_static_pad (converter, "sink"));
-
-
-  srcpad = gst_element_get_static_pad (rate, "src");
-  ghost = gst_ghost_pad_new ("src", srcpad);
-  gst_pad_set_active (ghost, TRUE);
-  gst_element_add_pad (topbin, ghost);
-
-  gst_object_unref (srcpad);
-
-  self->priv->nleobject = gst_element_factory_make ("nlesource", NULL);
-
-  if (self->priv->media_type == GES_MEDIA_TYPE_VIDEO)
-    g_object_set (decodebin, "caps", gst_caps_from_string (GES_RAW_VIDEO_CAPS),
-        "expose-all-streams", FALSE, "uri", self->priv->uri, NULL);
-  else
-    g_object_set (decodebin, "caps", gst_caps_from_string (GES_RAW_AUDIO_CAPS),
-        "expose-all-streams", FALSE, "uri", self->priv->uri, NULL);
-
-  if (!gst_bin_add (GST_BIN (self->priv->nleobject), topbin))
-    return;
-}
-
-static void
-_constructed (GObject *object)
-{
-  GESClip *clip = GES_CLIP (object);
-
-  _make_nle_object (clip);
-}
-
-static void
 ges_clip_class_init (GESClipClass *klass)
 {
   GObjectClass *g_object_class = G_OBJECT_CLASS (klass);
@@ -205,15 +207,12 @@ ges_clip_class_init (GESClipClass *klass)
 
   g_object_class->set_property = _set_property;
   g_object_class->get_property = _get_property;
-  g_object_class->constructed = _constructed;
 
   g_object_class_install_property (g_object_class, PROP_URI,
       g_param_spec_string ("uri", "URI", "uri of the resource", NULL,
           G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 
-  g_object_class_install_property (g_object_class, PROP_MEDIA_TYPE,
-      g_param_spec_flags ("media-type", "Media Type", "media type", GES_TYPE_MEDIA_TYPE, GES_MEDIA_TYPE_UNKNOWN,
-          G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+  g_object_class_override_property (g_object_class, PROP_MEDIA_TYPE, "media-type");
 }
 
 static void

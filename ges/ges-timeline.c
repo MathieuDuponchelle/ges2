@@ -66,13 +66,21 @@ _set_start (GESEditable *editable, GstClockTime start)
   return TRUE;
 }
 
+static GList *
+_get_nle_objects (GESEditable *editable)
+{
+  return g_list_copy (GES_TIMELINE (editable)->priv->nleobjects);
+}
+
 static void
 ges_editable_interface_init (GESEditableInterface * iface)
 {
   iface->set_inpoint = _set_inpoint;
   iface->set_duration = _set_duration;
   iface->set_start = _set_start;
+  iface->get_nle_objects = _get_nle_objects;
 }
+
 /* Implementation */
 
 static GList *
@@ -189,8 +197,10 @@ _create_composition (GESTimeline *self, const gchar *caps_string, const gchar *n
   GstElement *capsfilter = gst_element_factory_make ("capsfilter", NULL);
   GstElement *wrapper = gst_element_factory_make ("nlesource", NULL);
 
+  GST_ERROR_OBJECT (self, "creating composition %s with caps %s", name, caps_string);
   g_object_set (capsfilter, "caps", gst_caps_from_string (caps_string), NULL);
   g_object_set (composition, "caps", gst_caps_from_string (caps_string), NULL);
+  g_object_set (wrapper, "caps", gst_caps_from_string (caps_string), NULL);
 
   gst_bin_add (GST_BIN (wrapper), composition);
   gst_bin_add_many (GST_BIN(self), wrapper, capsfilter, NULL);
@@ -199,6 +209,7 @@ _create_composition (GESTimeline *self, const gchar *caps_string, const gchar *n
   self->priv->compositions = g_list_append (self->priv->compositions, composition);
   self->priv->nleobjects = g_list_append (self->priv->nleobjects, wrapper);
 
+  GST_ERROR_OBJECT (wrapper, "wrapper was created");
   _ghost_srcpad (self, capsfilter);
 
   return composition;
@@ -285,17 +296,42 @@ forward:
 /* API */
 
 gboolean
-ges_timeline_add_clip (GESTimeline *self, GESClip *clip)
+ges_timeline_add_editable (GESTimeline *self, GESEditable *editable)
 {
-  GstElement *composition = _get_first_composition (self, ges_clip_get_media_type (clip));
-  GstElement *nleobject;
+  GList *tmp;
+  GList *nleobjects = ges_editable_get_nle_objects (editable);
 
-  if (!composition)
-    return FALSE;
+  for (tmp = nleobjects; tmp; tmp = tmp->next) {
+    GstCaps *caps;
+    GstStructure *structure;
+    GESMediaType media_type;
+    GstElement *composition;
+    GstObject *parent = gst_object_get_parent (tmp->data);
 
-  nleobject = ges_clip_get_nleobject (clip);
-  g_object_set (nleobject, "priority", 2, NULL);
-  return gst_bin_add (GST_BIN (composition), nleobject);
+    g_object_get (tmp->data, "caps", &caps, NULL);
+    structure = gst_caps_get_structure (caps, 0);
+
+    if (gst_structure_has_name (structure, GES_RAW_AUDIO_CAPS))
+      media_type = GES_MEDIA_TYPE_AUDIO;
+    else if (gst_structure_has_name (structure, GES_RAW_VIDEO_CAPS))
+      media_type = GES_MEDIA_TYPE_VIDEO;
+    else
+      continue;
+
+    composition = _get_first_composition (self, media_type);
+    if (!composition)
+      continue;
+
+    g_object_set (tmp->data, "priority", 2, NULL);
+    if (parent) {
+      gst_object_ref (tmp->data);
+      gst_object_unparent (GST_OBJECT (tmp->data));
+      gst_object_unref (parent);
+    }
+    gst_bin_add (GST_BIN (composition), GST_ELEMENT (tmp->data));
+  }
+
+  return TRUE;
 }
 
 GESTimeline *
@@ -342,6 +378,8 @@ _set_property (GObject * object, guint property_id,
   switch (property_id) {
     case PROP_MEDIA_TYPE:
       self->priv->media_type = g_value_get_flags (value);
+      GST_ERROR ("timeline setting media type to %d\n", self->priv->media_type);
+      _make_nle_objects (self);
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
@@ -364,14 +402,6 @@ _get_property (GObject * object, guint property_id,
 }
 
 static void
-_constructed (GObject *object)
-{
-  GESTimeline *timeline = GES_TIMELINE (object);
-
-  _make_nle_objects (timeline);
-}
-
-static void
 ges_timeline_class_init (GESTimelineClass *klass)
 {
   GObjectClass *g_object_class = G_OBJECT_CLASS (klass);
@@ -381,12 +411,8 @@ ges_timeline_class_init (GESTimelineClass *klass)
 
   g_object_class->set_property = _set_property;
   g_object_class->get_property = _get_property;
-  g_object_class->constructed = _constructed;
 
-  g_object_class_install_property (g_object_class, PROP_MEDIA_TYPE,
-      g_param_spec_flags ("media-type", "Media Type", "media type",
-        GES_TYPE_MEDIA_TYPE, GES_MEDIA_TYPE_AUDIO | GES_MEDIA_TYPE_VIDEO,
-          G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+  g_object_class_override_property (g_object_class, PROP_MEDIA_TYPE, "media-type");
 
   bin_class->handle_message = GST_DEBUG_FUNCPTR (ges_timeline_handle_message);
 }
