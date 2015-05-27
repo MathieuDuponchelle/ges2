@@ -1,11 +1,13 @@
 #include "ges-timeline.h"
 #include "ges-clip.h"
+#include "ges-editable.h"
 #include "nle.h"
 
 /* Structure definitions */
 
 typedef struct _GESTimelinePrivate
 {
+  GList *compositions;
   GList *nleobjects;
   guint expected_async_done;
   guint group_id;
@@ -18,8 +20,59 @@ struct _GESTimeline
   GESTimelinePrivate *priv;
 };
 
-G_DEFINE_TYPE (GESTimeline, ges_timeline, GST_TYPE_BIN)
+static void ges_editable_interface_init (GESEditableInterface * iface);
 
+G_DEFINE_TYPE_WITH_CODE (GESTimeline, ges_timeline, GST_TYPE_BIN,
+    G_IMPLEMENT_INTERFACE (GES_TYPE_EDITABLE, ges_editable_interface_init))
+
+/* Interface implementation */
+
+static gboolean
+_set_inpoint (GESEditable *editable, GstClockTime inpoint)
+{
+  GESTimeline *timeline = GES_TIMELINE (editable);
+  GList *tmp;
+
+  for (tmp = timeline->priv->nleobjects; tmp; tmp = tmp->next) {
+    g_object_set (tmp->data, "inpoint", inpoint, NULL);
+  }
+
+  return TRUE;
+}
+
+static gboolean
+_set_duration (GESEditable *editable, GstClockTime duration)
+{
+  GESTimeline *timeline = GES_TIMELINE (editable);
+  GList *tmp;
+
+  for (tmp = timeline->priv->nleobjects; tmp; tmp = tmp->next) {
+    g_object_set (tmp->data, "duration", duration, NULL);
+  }
+
+  return TRUE;
+}
+
+static gboolean
+_set_start (GESEditable *editable, GstClockTime start)
+{
+  GESTimeline *timeline = GES_TIMELINE (editable);
+  GList *tmp;
+
+  for (tmp = timeline->priv->nleobjects; tmp; tmp = tmp->next) {
+    g_object_set (tmp->data, "start", start, NULL);
+  }
+
+  return TRUE;
+}
+
+static void
+ges_editable_interface_init (GESEditableInterface * iface)
+{
+  iface->set_inpoint = _set_inpoint;
+  iface->set_duration = _set_duration;
+  iface->set_start = _set_start;
+}
 /* Implementation */
 
 static GList *
@@ -28,9 +81,9 @@ _get_compositions (GESTimeline *self, GESMediaType media_type)
   GList *res = NULL, *tmp;
 
   if (media_type == GES_MEDIA_TYPE_UNKNOWN)
-    return g_list_copy (self->priv->nleobjects);
+    return g_list_copy (self->priv->compositions);
 
-  for (tmp = self->priv->nleobjects; tmp; tmp = tmp->next) {
+  for (tmp = self->priv->compositions; tmp; tmp = tmp->next) {
     GstCaps *caps;
     GstStructure *structure;
 
@@ -134,14 +187,18 @@ _create_composition (GESTimeline *self, const gchar *caps_string, const gchar *n
 {
   GstElement *composition = gst_element_factory_make ("nlecomposition", name);
   GstElement *capsfilter = gst_element_factory_make ("capsfilter", NULL);
+  GstElement *wrapper = gst_element_factory_make ("nlesource", NULL);
 
   g_object_set (capsfilter, "caps", gst_caps_from_string (caps_string), NULL);
   g_object_set (composition, "caps", gst_caps_from_string (caps_string), NULL);
 
-  gst_bin_add_many (GST_BIN(self), composition, capsfilter, NULL);
-  gst_element_link (composition, capsfilter);
+  gst_bin_add (GST_BIN (wrapper), composition);
+  gst_bin_add_many (GST_BIN(self), wrapper, capsfilter, NULL);
+  gst_element_link (wrapper, capsfilter);
 
-  self->priv->nleobjects = g_list_append (self->priv->nleobjects, composition);
+  self->priv->compositions = g_list_append (self->priv->compositions, composition);
+  self->priv->nleobjects = g_list_append (self->priv->nleobjects, wrapper);
+
   _ghost_srcpad (self, capsfilter);
 
   return composition;
@@ -189,7 +246,7 @@ ges_timeline_handle_message (GstBin * bin, GstMessage * message)
       GST_OBJECT_LOCK (timeline);
       if (timeline->priv->expected_async_done == 0) {
         amessage = gst_message_new_async_start (GST_OBJECT_CAST (bin));
-        timeline->priv->expected_async_done = g_list_length (timeline->priv->nleobjects);
+        timeline->priv->expected_async_done = g_list_length (timeline->priv->compositions);
         GST_INFO_OBJECT (timeline, "Posting ASYNC_START %s",
             gst_structure_get_string (mstructure, "reason"));
       }
@@ -247,16 +304,14 @@ ges_timeline_new (GESMediaType media_type)
   return g_object_new (GES_TYPE_TIMELINE, "media-type", media_type, NULL);
 }
 
-GList *
-ges_timeline_get_nleobjects (GESTimeline *self)
-{
-  return self->priv->nleobjects;
-}
-
 gboolean
 ges_timeline_commit (GESTimeline *self)
 {
   GList *tmp;
+
+  for (tmp = self->priv->compositions; tmp; tmp = tmp->next) {
+    nle_object_commit (NLE_OBJECT(tmp->data), TRUE);
+  }
 
   for (tmp = self->priv->nleobjects; tmp; tmp = tmp->next) {
     nle_object_commit (NLE_OBJECT(tmp->data), TRUE);
@@ -342,6 +397,7 @@ ges_timeline_init (GESTimeline *self)
   self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self,
       GES_TYPE_TIMELINE, GESTimelinePrivate);
 
+  self->priv->compositions = NULL;
   self->priv->nleobjects = NULL;
   self->priv->expected_async_done = 0;
   self->priv->group_id = -1;

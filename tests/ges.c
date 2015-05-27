@@ -88,6 +88,33 @@ test_gaps (void)
   return timeline;
 }
 
+static GESTimeline *
+test_editable_timeline (void)
+{
+  GESClip *audio_clip1 = ges_clip_new ("file:///home/meh/Videos/homeland.mp4", GES_MEDIA_TYPE_VIDEO);
+  GESClip *audio_clip2 = ges_clip_new ("file:///home/meh/Videos/homeland.mp4", GES_MEDIA_TYPE_VIDEO);
+  GESTimeline *timeline = ges_timeline_new(GES_MEDIA_TYPE_VIDEO);
+
+  ges_editable_set_duration (GES_EDITABLE (audio_clip1), 5 * GST_SECOND);
+  ges_editable_set_duration (GES_EDITABLE (audio_clip2), 5 * GST_SECOND);
+
+  ges_editable_set_inpoint (GES_EDITABLE (audio_clip1), 60 * GST_SECOND);
+  ges_editable_set_inpoint (GES_EDITABLE (audio_clip2), 60 * GST_SECOND);
+
+  ges_editable_set_start (GES_EDITABLE (audio_clip1), 0 * GST_SECOND);
+  ges_editable_set_start (GES_EDITABLE (audio_clip2), 10 * GST_SECOND);
+
+  ges_timeline_add_clip (timeline, audio_clip1);
+  ges_timeline_add_clip (timeline, audio_clip2);
+
+  ges_editable_set_inpoint (GES_EDITABLE (timeline), 3 * GST_SECOND);
+  ges_editable_set_duration (GES_EDITABLE (timeline), 15 * GST_SECOND);
+
+  ges_timeline_commit (timeline);
+
+  return timeline;
+}
+
 int main (int ac, char **av)
 {
   GESTimeline *timeline;
@@ -101,8 +128,9 @@ int main (int ac, char **av)
   if (FALSE) {
     timeline = test_sync ();
     timeline = test_gaps ();
+    timeline = test_editable_timeline ();
   } else {
-    timeline = test_gaps ();
+    timeline = test_editable_timeline ();
   }
 
   uri = g_strdup_printf ("ges:///%p\n", (void *) timeline);
