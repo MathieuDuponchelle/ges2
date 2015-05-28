@@ -13,6 +13,7 @@ typedef struct _GESClipPrivate
   GstObject *old_parent;
   GstPad *ghostpad;
   GstPad *static_sinkpad;
+  guint track_index;
 } GESClipPrivate;
 
 struct _GESClip
@@ -209,6 +210,39 @@ _set_start (GESEditable *editable, GstClockTime start)
   return TRUE;
 }
 
+static GstClockTime
+_get_start (GESEditable *editable)
+{
+  GstClockTime time;
+  GESClip *self = GES_CLIP (editable);
+
+  g_object_get (self->priv->nleobject, "start", &time, NULL);
+
+  return time;
+}
+
+static GstClockTime
+_get_inpoint (GESEditable *editable)
+{
+  GstClockTime time;
+  GESClip *self = GES_CLIP (editable);
+
+  g_object_get (self->priv->nleobject, "inpoint", &time, NULL);
+
+  return time;
+}
+
+static GstClockTime
+_get_duration (GESEditable *editable)
+{
+  GstClockTime time;
+  GESClip *self = GES_CLIP (editable);
+
+  g_object_get (self->priv->nleobject, "duration", &time, NULL);
+
+  return time;
+}
+
 static GList *
 _get_nle_objects (GESEditable *editable)
 {
@@ -227,8 +261,20 @@ _set_track_index (GESEditable *editable, GESMediaType media_type, guint index)
   new_priority = (TRACK_PRIORITY_HEIGHT * index) + TIMELINE_PRIORITY_OFFSET;
 
   g_object_set (self->priv->nleobject, "priority", new_priority, NULL);
+  self->priv->track_index = index;
 
   return TRUE;
+}
+
+static guint
+_get_track_index (GESEditable *editable, GESMediaType media_type)
+{
+  GESClip *self = GES_CLIP (editable);
+
+  if (!(media_type & self->priv->media_type))
+      return G_MAXUINT;
+
+  return self->priv->track_index;
 }
 
 static void
@@ -237,8 +283,12 @@ ges_editable_interface_init (GESEditableInterface * iface)
   iface->set_inpoint = _set_inpoint;
   iface->set_duration = _set_duration;
   iface->set_start = _set_start;
+  iface->get_inpoint = _get_inpoint;
+  iface->get_duration = _get_duration;
+  iface->get_start = _get_start;
   iface->get_nle_objects = _get_nle_objects;
   iface->set_track_index = _set_track_index;
+  iface->get_track_index = _get_track_index;
 }
 
 /* GObject initialization */

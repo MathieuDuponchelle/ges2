@@ -205,6 +205,30 @@ test_play_clip_in_timeline (void)
   play_playable (GES_PLAYABLE (timeline2));
 }
 
+static GESTimeline *
+test_transitions ()
+{
+  GESClip *video_clip1 = ges_clip_new ("file:///home/meh/Videos/homeland.mp4", GES_MEDIA_TYPE_VIDEO);
+  GESClip *video_clip2 = ges_clip_new ("file:///home/meh/Videos/homeland.mp4", GES_MEDIA_TYPE_VIDEO);
+  GESTimeline *timeline = ges_timeline_new(GES_MEDIA_TYPE_VIDEO);
+
+  ges_editable_set_duration (GES_EDITABLE (video_clip1), 5 * GST_SECOND);
+  ges_editable_set_duration (GES_EDITABLE (video_clip2), 5 * GST_SECOND);
+
+  ges_editable_set_inpoint (GES_EDITABLE (video_clip1), 60 * GST_SECOND);
+  ges_editable_set_inpoint (GES_EDITABLE (video_clip2), 150 * GST_SECOND);
+
+  ges_editable_set_start (GES_EDITABLE (video_clip1), 0 * GST_SECOND);
+  ges_editable_set_start (GES_EDITABLE (video_clip2), 2 * GST_SECOND);
+
+  ges_timeline_add_editable (timeline, GES_EDITABLE (video_clip1));
+  ges_timeline_add_editable (timeline, GES_EDITABLE (video_clip2));
+
+  ges_timeline_commit (timeline);
+
+  return timeline;
+}
+
 int main (int ac, char **av)
 {
   GESTimeline *timeline = NULL;
@@ -218,8 +242,9 @@ int main (int ac, char **av)
     timeline = test_editable_timeline ();
     timeline = test_timeline_nesting ();
     test_playable_clip ();
-  } else {
     test_play_clip_in_timeline ();
+  } else {
+    timeline = test_transitions ();
   }
 
   if (timeline) {

@@ -10,6 +10,7 @@ typedef struct _GESTimelinePrivate
 {
   GList *compositions;
   GList *nleobjects;
+  GSequence *editable_by_start;
   guint expected_async_done;
   guint group_id;
   GESMediaType media_type;
@@ -433,6 +434,27 @@ forward:
   gst_element_post_message (GST_ELEMENT_CAST (bin), message);
 }
 
+static void
+_update_transitions (GESTimeline *self)
+{
+}
+
+static gint
+_compare_starts (GESEditable *editable1, GESEditable *editable2, gpointer unused)
+{
+  GstClockTime start1, start2;
+
+  start1 = ges_editable_get_start (editable1);
+  start2 = ges_editable_get_start (editable2);
+
+  if (start1 < start2)
+    return -42;
+  else if (start1 == start2)
+    return 0;
+  else
+    return 42;
+}
+
 /* API */
 
 gboolean
@@ -473,6 +495,7 @@ ges_timeline_add_editable (GESTimeline *self, GESEditable *editable)
     gst_bin_add (GST_BIN (composition), GST_ELEMENT (tmp->data));
   }
 
+  g_sequence_insert_sorted (self->priv->editable_by_start, editable, (GCompareDataFunc) _compare_starts, NULL);
   return TRUE;
 }
 
@@ -486,6 +509,8 @@ gboolean
 ges_timeline_commit (GESTimeline *self)
 {
   GList *tmp;
+
+  _update_transitions (self);
 
   for (tmp = self->priv->compositions; tmp; tmp = tmp->next) {
     nle_object_commit (NLE_OBJECT(tmp->data), TRUE);
@@ -571,4 +596,5 @@ ges_timeline_init (GESTimeline *self)
   self->priv->expected_async_done = 0;
   self->priv->group_id = -1;
   self->priv->is_playable = FALSE;
+  self->priv->editable_by_start = g_sequence_new (NULL);
 }

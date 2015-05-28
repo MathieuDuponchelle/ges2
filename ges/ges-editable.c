@@ -11,6 +11,10 @@ ges_editable_default_init (GESEditableInterface * iface)
   iface->set_start = NULL;
   iface->get_nle_objects = NULL;
   iface->set_track_index = NULL;
+  iface->get_track_index = NULL;
+  iface->get_inpoint = NULL;
+  iface->get_duration = NULL;
+  iface->get_start = NULL;
 
   g_object_interface_install_property (iface,
       g_param_spec_flags ("media-type",
@@ -51,6 +55,39 @@ ges_editable_set_start (GESEditable *editable, GstClockTime start)
     return iface->set_start (editable, start);
 
   return FALSE;
+}
+
+GstClockTime
+ges_editable_get_inpoint (GESEditable *editable)
+{
+  GESEditableInterface *iface = GES_EDITABLE_GET_IFACE (editable);
+
+  if (iface->get_inpoint)
+    return iface->get_inpoint (editable);
+
+  return GST_CLOCK_TIME_NONE;
+}
+
+GstClockTime
+ges_editable_get_start (GESEditable *editable)
+{
+  GESEditableInterface *iface = GES_EDITABLE_GET_IFACE (editable);
+
+  if (iface->get_start)
+    return iface->get_start (editable);
+
+  return GST_CLOCK_TIME_NONE;
+}
+
+GstClockTime
+ges_editable_get_duration (GESEditable *editable)
+{
+  GESEditableInterface *iface = GES_EDITABLE_GET_IFACE (editable);
+
+  if (iface->get_duration)
+    return iface->get_duration (editable);
+
+  return GST_CLOCK_TIME_NONE;
 }
 
 GList *
