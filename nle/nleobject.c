@@ -77,6 +77,7 @@ enum
   PROP_ACTIVE,
   PROP_CAPS,
   PROP_EXPANDABLE,
+  PROP_COMPOSITION,
   PROP_LAST
 };
 
@@ -236,6 +237,14 @@ nle_object_class_init (NleObjectClass * klass)
       G_PARAM_READWRITE);
   g_object_class_install_property (gobject_class, PROP_EXPANDABLE,
       properties[PROP_EXPANDABLE]);
+
+  properties[PROP_COMPOSITION] =
+      g_param_spec_object ("composition", "Composition",
+      "The container composition", GST_TYPE_ELEMENT,
+      G_PARAM_READABLE);
+
+  g_object_class_install_property (gobject_class, PROP_COMPOSITION,
+      properties[PROP_COMPOSITION]);
 }
 
 static void
@@ -548,6 +557,9 @@ nle_object_get_property (GObject * object, guint prop_id,
       break;
     case PROP_EXPANDABLE:
       g_value_set_boolean (value, NLE_OBJECT_IS_EXPANDABLE (object));
+      break;
+    case PROP_COMPOSITION:
+      g_value_set_object (value, nleobject->composition);
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);

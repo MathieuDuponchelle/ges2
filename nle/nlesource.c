@@ -476,7 +476,8 @@ nle_source_prepare (NleObject * object)
     return FALSE;
   }
 
-  if (object->in_composition == FALSE) {
+  if (!object->composition) {
+    GST_ERROR ("seeking ourselves because we ain't in a composition");
     gst_element_send_event (GST_ELEMENT_CAST (object),
         gst_event_new_seek (1.0, GST_FORMAT_TIME,
             GST_SEEK_FLAG_ACCURATE | GST_SEEK_FLAG_FLUSH,

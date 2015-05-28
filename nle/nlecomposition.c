@@ -2942,7 +2942,7 @@ nle_composition_add_object (GstBin * bin, GstElement * element)
   object = NLE_OBJECT (element);
   gst_object_ref_sink (object);
 
-  object->in_composition = TRUE;
+  object->composition = GST_ELEMENT (comp);
   _add_add_object_action (comp, object);
 
   return TRUE;
@@ -3046,7 +3046,7 @@ nle_composition_remove_object (GstBin * bin, GstElement * element)
 
   object = NLE_OBJECT (element);
 
-  object->in_composition = FALSE;
+  object->composition = NULL;
   _add_remove_object_action (comp, object);
 
   return TRUE;

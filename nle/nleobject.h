@@ -125,7 +125,7 @@ struct _NleObject
   gint64 segment_start;
   gint64 segment_stop;
 
-  gboolean in_composition;
+  GstElement *composition;
 };
 
 struct _NleObjectClass
