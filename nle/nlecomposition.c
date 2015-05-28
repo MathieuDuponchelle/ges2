@@ -2779,6 +2779,22 @@ _set_real_eos_seqnum_from_seek (NleComposition * comp, GstEvent * event)
   return TRUE;
 }
 
+static gboolean
+_print_stack (GNode *node, gpointer unused)
+{
+  NleObject *obj = NLE_OBJECT (node->data);
+  g_print ("%*s %d\n", g_node_depth (node) * 4, gst_object_get_name (GST_OBJECT (obj)), obj->priority);
+
+  return FALSE;
+}
+
+static void
+_dump_stack (GNode *stack)
+{
+  GST_ERROR ("dumping stack now");
+  g_node_traverse (stack, G_LEVEL_ORDER, G_TRAVERSE_ALL, -1, _print_stack, NULL);
+}
+
 /*
  * update_pipeline:
  * @comp: The #NleComposition
@@ -2882,6 +2898,7 @@ update_pipeline (NleComposition * comp, GstClockTime currenttime, gint32 seqnum,
 
   /* If stacks are different, unlink/relink objects */
   if (!samestack) {
+    _dump_stack (stack);
     _deactivate_stack (comp, _have_to_flush_downstream (update_reason));
     _relink_new_stack (comp, stack, toplevel_seek);
   }

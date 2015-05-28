@@ -69,11 +69,18 @@ _make_nle_object (GESClip *self)
   GstElement *decodebin, *rate, *converter;
   GstElement *topbin;
   GstPad *srcpad, *ghost;
+  gchar *actual_name, *given_name;
 
   topbin = gst_bin_new (NULL);
   decodebin = gst_element_factory_make ("uridecodebin", NULL);
 
+  /* Let's give it a better name */
   self->priv->nleobject = gst_element_factory_make ("nlesource", NULL);
+  given_name = gst_object_get_name (GST_OBJECT (self->priv->nleobject));
+  actual_name = g_strdup_printf ("%s->%s", given_name, self->priv->uri);
+  gst_object_set_name (GST_OBJECT (self->priv->nleobject), actual_name);
+  g_free (actual_name);
+  g_free (given_name);
 
   if (self->priv->media_type == GES_MEDIA_TYPE_VIDEO) {
     converter = gst_element_factory_make ("videoconvert", NULL);

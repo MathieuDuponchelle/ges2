@@ -308,9 +308,9 @@ _get_first_composition (GESTimeline *self, GESMediaType media_type)
 }
 
 static void
-_add_expandable_operation (GstElement *composition, const gchar *element_name, guint priority)
+_add_expandable_operation (GstElement *composition, const gchar *element_name, guint priority, const gchar *name)
 {
-  GstElement *expandable = gst_element_factory_make ("nleoperation", NULL);
+  GstElement *expandable = gst_element_factory_make ("nleoperation", name);
   GstElement *element = gst_element_factory_make (element_name, NULL);
 
   gst_bin_add (GST_BIN (expandable), element);
@@ -320,9 +320,9 @@ _add_expandable_operation (GstElement *composition, const gchar *element_name, g
 }
 
 static void
-_add_expandable_source (GstElement *composition, const gchar *element_name, guint priority)
+_add_expandable_source (GstElement *composition, const gchar *element_name, guint priority, const gchar *name)
 {
-  GstElement *expandable = gst_element_factory_make ("nlesource", NULL);
+  GstElement *expandable = gst_element_factory_make ("nlesource", name);
   GstElement *element = gst_element_factory_make (element_name, NULL);
 
   gst_bin_add (GST_BIN (expandable), element);
@@ -361,14 +361,14 @@ _make_nle_objects (GESTimeline *self)
 
   if (self->priv->media_type & GES_MEDIA_TYPE_AUDIO) {
     composition = _create_composition (self, GES_RAW_AUDIO_CAPS, "audio-composition");
-    _add_expandable_operation (composition, "audiomixer", 0);
-    _add_expandable_source (composition, "audiotestsrc", 1);
+    _add_expandable_operation (composition, "audiomixer", 0, "timeline-audiomixer");
+    _add_expandable_source (composition, "audiotestsrc", 1, "timeline-audio-background");
   }
 
   if (self->priv->media_type & GES_MEDIA_TYPE_VIDEO) {
     composition = _create_composition (self, GES_RAW_VIDEO_CAPS, "video-composition");
-    _add_expandable_operation (composition, "compositor", 0);
-    _add_expandable_source (composition, "videotestsrc", 1);
+    _add_expandable_operation (composition, "compositor", 0, "timeline-videomixer");
+    _add_expandable_source (composition, "videotestsrc", 1, "timeline-video-background");
   }
 }
 
