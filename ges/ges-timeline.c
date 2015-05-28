@@ -1,6 +1,7 @@
 #include "ges-timeline.h"
 #include "ges-clip.h"
 #include "ges-editable.h"
+#include "ges-playable.h"
 #include "nle.h"
 
 /* Structure definitions */
@@ -12,6 +13,8 @@ typedef struct _GESTimelinePrivate
   guint expected_async_done;
   guint group_id;
   GESMediaType media_type;
+  GList *ghostpads;
+  gboolean is_playable;
 } GESTimelinePrivate;
 
 struct _GESTimeline
@@ -20,12 +23,18 @@ struct _GESTimeline
   GESTimelinePrivate *priv;
 };
 
+#define NLE_OBJECT_OLD_PARENT (g_quark_from_string ("nle_object_old_parent_quark"))
+
 static void ges_editable_interface_init (GESEditableInterface * iface);
+static void ges_playable_interface_init (GESPlayableInterface * iface);
 
 G_DEFINE_TYPE_WITH_CODE (GESTimeline, ges_timeline, GST_TYPE_BIN,
-    G_IMPLEMENT_INTERFACE (GES_TYPE_EDITABLE, ges_editable_interface_init))
+    G_IMPLEMENT_INTERFACE (GES_TYPE_EDITABLE, ges_editable_interface_init)
+    G_IMPLEMENT_INTERFACE (GES_TYPE_PLAYABLE, ges_playable_interface_init))
 
 /* Interface implementation */
+
+/* GESEditable */
 
 static gboolean
 _set_inpoint (GESEditable *editable, GstClockTime inpoint)
@@ -81,6 +90,146 @@ ges_editable_interface_init (GESEditableInterface * iface)
   iface->get_nle_objects = _get_nle_objects;
 }
 
+/* GESPlayable */
+
+static GstPadProbeReturn
+_pad_probe_cb (GstPad * mixer_pad, GstPadProbeInfo * info,
+    GESTimeline * timeline)
+{
+  GstEvent *event = GST_PAD_PROBE_INFO_EVENT (info);
+  if (GST_EVENT_TYPE (event) == GST_EVENT_STREAM_START) {
+    if (timeline->priv->group_id == -1) {
+      if (!gst_event_parse_group_id (event, &timeline->priv->group_id))
+        timeline->priv->group_id = gst_util_group_id_next ();
+    }
+
+    info->data = gst_event_make_writable (event);
+    gst_event_set_group_id (GST_PAD_PROBE_INFO_EVENT (info),
+        timeline->priv->group_id);
+
+    return GST_PAD_PROBE_REMOVE;
+  }
+
+  return GST_PAD_PROBE_OK;
+}
+
+static void
+_expose_nle_objects (GESTimeline *self)
+{
+  GList *tmp, *gpads;
+
+  gpads = self->priv->ghostpads;
+
+  for (tmp = self->priv->nleobjects; tmp; tmp = tmp->next)
+  {
+    GstElement *capsfilter = gst_element_factory_make ("capsfilter", NULL);
+    GstCaps *caps;
+    GstElement *old_parent;
+    GstPad *pad = gst_element_get_static_pad (capsfilter, "src");
+
+    g_object_get (tmp->data, "composition", &old_parent, NULL);
+
+    if (old_parent) {
+      gst_object_ref (tmp->data);
+      gst_bin_remove (GST_BIN (old_parent), GST_ELEMENT (tmp->data));
+      g_object_set_qdata (tmp->data, NLE_OBJECT_OLD_PARENT, gst_object_ref (old_parent));
+      nle_object_commit (NLE_OBJECT (old_parent), TRUE);
+    }
+
+    g_object_get (tmp->data, "caps", &caps, NULL);
+    g_object_set (capsfilter, "caps", gst_caps_copy (caps), NULL);
+    gst_caps_unref (caps);
+
+    gst_bin_add_many (GST_BIN (self), capsfilter, tmp->data, NULL);
+    gst_element_link (tmp->data, capsfilter);
+
+    gst_ghost_pad_set_target (GST_GHOST_PAD (gpads->data), pad);
+    gst_pad_set_active (GST_PAD(gpads->data), TRUE);
+
+    gst_pad_add_probe (pad,
+        GST_PAD_PROBE_TYPE_EVENT_DOWNSTREAM,
+        (GstPadProbeCallback) _pad_probe_cb, self, NULL);
+
+    gpads = gpads->next;
+  }
+
+  gst_element_no_more_pads (GST_ELEMENT (self));
+}
+
+static gboolean
+_remove_child (GValue * item, GValue * ret G_GNUC_UNUSED, GstBin * bin)
+{
+  GstElement *child = g_value_get_object (item);
+
+  gst_bin_remove (bin, child);
+
+  return TRUE;
+}
+
+static void
+_empty_bin (GstBin * bin)
+{
+  GstIterator *children;
+
+  children = gst_bin_iterate_elements (bin);
+
+  while (G_UNLIKELY (gst_iterator_fold (children,
+              (GstIteratorFoldFunction) _remove_child, NULL,
+              bin) == GST_ITERATOR_RESYNC)) {
+    gst_iterator_resync (children);
+  }
+
+  gst_iterator_free (children);
+}
+
+static void
+_unexpose_nle_objects (GESTimeline *self)
+{
+  GList *tmp;
+  GList *gpads = self->priv->ghostpads;
+
+  g_list_foreach (self->priv->nleobjects, (GFunc) gst_object_ref, NULL);
+  _empty_bin (GST_BIN (self));
+
+  for (tmp = self->priv->nleobjects; tmp; tmp = tmp->next) {
+    GstElement *old_parent;
+
+    gst_ghost_pad_set_target (GST_GHOST_PAD (gpads->data), NULL);
+    gst_pad_set_active (GST_PAD (gpads->data), FALSE);
+    old_parent = GST_ELEMENT (g_object_get_qdata (tmp->data, NLE_OBJECT_OLD_PARENT));
+
+    if (old_parent) {
+      gst_bin_add (GST_BIN (old_parent), GST_ELEMENT (tmp->data));
+      gst_object_unref (old_parent);
+      nle_object_commit (NLE_OBJECT (old_parent), TRUE);
+      g_object_set_qdata (tmp->data, NLE_OBJECT_OLD_PARENT, NULL);
+    }
+
+    gpads = gpads->next;
+  }
+}
+
+static gboolean
+_make_playable (GESPlayable *playable, gboolean is_playable)
+{
+  GESTimeline *self = GES_TIMELINE (playable);
+
+  if (is_playable) {
+    _expose_nle_objects (self);
+    self->priv->is_playable = TRUE;
+  } else {
+    _unexpose_nle_objects (self);
+  }
+
+  return TRUE;
+}
+
+static void
+ges_playable_interface_init (GESPlayableInterface * iface)
+{
+  iface->make_playable = _make_playable;
+}
+
 /* Implementation */
 
 static GList *
@@ -124,48 +273,6 @@ _get_first_composition (GESTimeline *self, GESMediaType media_type)
   return res;
 }
 
-static GstPadProbeReturn
-_pad_probe_cb (GstPad * mixer_pad, GstPadProbeInfo * info,
-    GESTimeline * timeline)
-{
-  GstEvent *event = GST_PAD_PROBE_INFO_EVENT (info);
-  if (GST_EVENT_TYPE (event) == GST_EVENT_STREAM_START) {
-    if (timeline->priv->group_id == -1) {
-      if (!gst_event_parse_group_id (event, &timeline->priv->group_id))
-        timeline->priv->group_id = gst_util_group_id_next ();
-    }
-
-    info->data = gst_event_make_writable (event);
-    gst_event_set_group_id (GST_PAD_PROBE_INFO_EVENT (info),
-        timeline->priv->group_id);
-
-    return GST_PAD_PROBE_REMOVE;
-  }
-
-  return GST_PAD_PROBE_OK;
-}
-
-static void
-_ghost_srcpad (GESTimeline *self, GstElement *element)
-{
-  GstPad *pad, *ghostpad;
-  gchar *padname;
-
-  pad = gst_element_get_static_pad (element, "src");
-
-  /* ghost it ! */
-  GST_DEBUG ("Ghosting pad and adding it to ourself");
-  padname = g_strdup_printf ("comp_%p_src", element);
-  ghostpad = gst_ghost_pad_new (padname, pad);
-  g_free (padname);
-  gst_pad_set_active (ghostpad, TRUE);
-  gst_element_add_pad (GST_ELEMENT (self), ghostpad);
-
-  gst_pad_add_probe (pad,
-      GST_PAD_PROBE_TYPE_EVENT_DOWNSTREAM,
-      (GstPadProbeCallback) _pad_probe_cb, self, NULL);
-}
-
 static void
 _add_expandable_operation (GstElement *composition, const gchar *element_name, guint priority)
 {
@@ -193,24 +300,22 @@ _add_expandable_source (GstElement *composition, const gchar *element_name, guin
 static GstElement *
 _create_composition (GESTimeline *self, const gchar *caps_string, const gchar *name)
 {
+  GstPad *ghostpad;
   GstElement *composition = gst_element_factory_make ("nlecomposition", name);
-  GstElement *capsfilter = gst_element_factory_make ("capsfilter", NULL);
   GstElement *wrapper = gst_element_factory_make ("nlesource", NULL);
 
-  GST_ERROR_OBJECT (self, "creating composition %s with caps %s", name, caps_string);
-  g_object_set (capsfilter, "caps", gst_caps_from_string (caps_string), NULL);
+  GST_DEBUG_OBJECT (self, "creating composition %s with caps %s", name, caps_string);
   g_object_set (composition, "caps", gst_caps_from_string (caps_string), NULL);
   g_object_set (wrapper, "caps", gst_caps_from_string (caps_string), NULL);
 
   gst_bin_add (GST_BIN (wrapper), composition);
-  gst_bin_add_many (GST_BIN(self), wrapper, capsfilter, NULL);
-  gst_element_link (wrapper, capsfilter);
 
   self->priv->compositions = g_list_append (self->priv->compositions, composition);
   self->priv->nleobjects = g_list_append (self->priv->nleobjects, wrapper);
 
-  GST_ERROR_OBJECT (wrapper, "wrapper was created");
-  _ghost_srcpad (self, capsfilter);
+  ghostpad = gst_ghost_pad_new_no_target (NULL, GST_PAD_SRC);
+  gst_element_add_pad (GST_ELEMENT (self), ghostpad);
+  self->priv->ghostpads = g_list_append (self->priv->ghostpads, ghostpad);
 
   return composition;
 }
@@ -231,14 +336,15 @@ _make_nle_objects (GESTimeline *self)
     _add_expandable_operation (composition, "compositor", 0);
     _add_expandable_source (composition, "videotestsrc", 1);
   }
-
-  gst_element_no_more_pads (GST_ELEMENT (self));
 }
 
 static void
 ges_timeline_handle_message (GstBin * bin, GstMessage * message)
 {
   GESTimeline *timeline = GES_TIMELINE (bin);
+
+  if (!timeline->priv->is_playable)
+    goto forward;
 
   if (GST_MESSAGE_TYPE (message) == GST_MESSAGE_ELEMENT) {
     GstMessage *amessage = NULL;
@@ -325,9 +431,10 @@ ges_timeline_add_editable (GESTimeline *self, GESEditable *editable)
     g_object_set (tmp->data, "priority", 2, NULL);
     if (parent) {
       gst_object_ref (tmp->data);
-      gst_object_unparent (GST_OBJECT (tmp->data));
+      gst_bin_remove (GST_BIN (parent), GST_ELEMENT (tmp->data));
       gst_object_unref (parent);
     }
+    GST_DEBUG_OBJECT (tmp->data, "got added in composition %p", composition);
     gst_bin_add (GST_BIN (composition), GST_ELEMENT (tmp->data));
   }
 
@@ -378,7 +485,7 @@ _set_property (GObject * object, guint property_id,
   switch (property_id) {
     case PROP_MEDIA_TYPE:
       self->priv->media_type = g_value_get_flags (value);
-      GST_ERROR ("timeline setting media type to %d\n", self->priv->media_type);
+      GST_DEBUG_OBJECT (self, "timeline setting media type to %d\n", self->priv->media_type);
       _make_nle_objects (self);
       break;
     default:
@@ -425,6 +532,8 @@ ges_timeline_init (GESTimeline *self)
 
   self->priv->compositions = NULL;
   self->priv->nleobjects = NULL;
+  self->priv->ghostpads = NULL;
   self->priv->expected_async_done = 0;
   self->priv->group_id = -1;
+  self->priv->is_playable = FALSE;
 }

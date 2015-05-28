@@ -36,6 +36,8 @@
 #endif
 
 #include <gst/gst.h>
+
+#include "ges-playable.h"
 #include "gstgessource.h"
 
 GST_DEBUG_CATEGORY_STATIC (gstgessource);
@@ -43,13 +45,13 @@ GST_DEBUG_CATEGORY_STATIC (gstgessource);
 
 struct _GstGesSource {
   GstBin parent;
-  GstElement *clip;
+  GESPlayable *playable;
 };
 
 enum
 {
   PROP_0,
-  PROP_CLIP,
+  PROP_PLAYABLE,
   PROP_LAST
 };
 
@@ -63,72 +65,25 @@ G_DEFINE_TYPE_WITH_CODE (GstGesSource, gst_ges_source, GST_TYPE_BIN,
 static GParamSpec *properties[PROP_LAST];
 
 static gboolean
-gst_ges_source_set_clip (GstGesSource * self, GESClip * clip)
-{
-  GstBin *sbin = GST_BIN (self);
-  GstElement *nleobject;
-
-  if (self->clip) {
-    GST_FIXME_OBJECT (self, "Implement changing clip support");
-
-    return FALSE;
-  }
-
-  self->clip = GST_ELEMENT (clip);
-
-  nleobject = ges_clip_get_nleobject(clip);
-  GST_ERROR ("added clip :%d", gst_bin_add (sbin, nleobject));
-  {
-    GstPad *gpad;
-    GstPad *pad = gst_element_get_static_pad (nleobject, "src");
-
-    gpad = gst_ghost_pad_new ("clip-ghost", pad);
-
-    gst_pad_set_active (gpad, TRUE);
-    gst_element_add_pad (GST_ELEMENT (self), gpad);
-  }
-
-  return TRUE;
-}
-
-static gboolean
-videopad_query_function (GstPad * pad, GstObject * parent,
-    GstQuery * query)
-{
-  gboolean ret = TRUE;
-
-  switch GST_QUERY_TYPE (query) {
-    case GST_QUERY_CAPS:
-      gst_query_set_caps_result (query, gst_caps_from_string ("video/x-raw"));
-      GST_ERROR ("we got our caps queried");
-      break;
-    default:
-      ret = gst_pad_query_default (pad, parent, query);
-      break;
-  }
-
-  return ret;
-}
-
-static gboolean
-gst_ges_source_set_timeline (GstGesSource * self, GESTimeline *timeline)
+gst_ges_source_set_playable (GstGesSource * self, GESPlayable *playable)
 {
   GstBin *sbin = GST_BIN (self);
   GstIterator *pads;
   gboolean done = FALSE;
   GValue paditem = { 0, };
 
-  if (self->clip) {
-    GST_FIXME_OBJECT (self, "Implement changing clip support");
+  if (self->playable) {
+    GST_FIXME_OBJECT (self, "Implement changing playable support");
 
     return FALSE;
   }
 
-  self->clip = GST_ELEMENT (timeline);
+  self->playable = playable;
+  ges_playable_make_playable (playable, TRUE);
 
-  pads = gst_element_iterate_src_pads (GST_ELEMENT (timeline));
+  pads = gst_element_iterate_src_pads (GST_ELEMENT (playable));
 
-  gst_bin_add (sbin, GST_ELEMENT (timeline));
+  gst_bin_add (sbin, GST_ELEMENT (playable));
 
   while (!done) {
     switch (gst_iterator_next (pads, &paditem)) {
@@ -182,22 +137,17 @@ gst_ges_source_uri_get_uri (GstURIHandler * handler)
 {
   GstGesSource *self = GST_GES_SOURCE (handler);
 
-  return self->clip ? g_strdup_printf ("ges://%p", self->clip) : NULL;
+  return self->playable ? g_strdup_printf ("ges://%p", self->playable) : NULL;
 }
 
 static gboolean
 gst_ges_source_uri_set_uri (GstURIHandler * handler, const gchar * uri,
     GError ** error)
 {
-  GST_ERROR ("handling uri : %s\n", uri);
   void *ptr;
 
   ptr = (void *) g_ascii_strtoull (uri + 7, NULL, 16);
-  GST_ERROR ("pointer is : %p", ptr);
-  if (GES_IS_CLIP (ptr))
-    gst_ges_source_set_clip (GST_GES_SOURCE (handler), GES_CLIP (ptr));
-  else if (GES_IS_TIMELINE (ptr))
-    gst_ges_source_set_timeline (GST_GES_SOURCE (handler), GES_TIMELINE (ptr));
+  gst_ges_source_set_playable (GST_GES_SOURCE (handler), GES_PLAYABLE (ptr));
   return TRUE;
 }
 
@@ -219,8 +169,8 @@ gst_ges_source_get_property (GObject * object, guint property_id,
   GstGesSource *self = GST_GES_SOURCE (object);
 
   switch (property_id) {
-    case PROP_CLIP:
-      g_value_set_object (value, self->clip);
+    case PROP_PLAYABLE:
+      g_value_set_object (value, self->playable);
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
@@ -234,12 +184,27 @@ gst_ges_source_set_property (GObject * object, guint property_id,
   GstGesSource *self = GST_GES_SOURCE (object);
 
   switch (property_id) {
-    case PROP_CLIP:
-      gst_ges_source_set_clip (self, g_value_get_object (value));
+    case PROP_PLAYABLE:
+      gst_ges_source_set_playable (self, g_value_get_object (value));
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
   }
+}
+
+static void
+_dispose (GObject *object)
+{
+  GstGesSource *self = GST_GES_SOURCE (object);
+  GstBin *sbin = GST_BIN (self);
+
+  if (self->playable) {
+    gst_object_ref (self->playable);
+    gst_bin_remove (sbin, GST_ELEMENT (self->playable));
+    ges_playable_make_playable (self->playable, FALSE);
+  }
+
+  G_OBJECT_CLASS (gst_ges_source_parent_class)->dispose (object);
 }
 
 static void
@@ -258,12 +223,13 @@ gst_ges_source_class_init (GstGesSourceClass * self_class)
    *
    * Clip to use in this source.
    */
-  properties[PROP_CLIP] = g_param_spec_object ("clip", "Clip",
-      "Clip to use in this source.",
+  properties[PROP_PLAYABLE] = g_param_spec_object ("playable", "Playable",
+      "GESPlayable to use in this source.",
       GST_TYPE_ELEMENT, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS);
 
   g_object_class_install_properties (gclass, PROP_LAST, properties);
 
+  gclass->dispose = _dispose;
 }
 
 static void
