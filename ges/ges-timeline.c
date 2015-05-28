@@ -81,6 +81,39 @@ _get_nle_objects (GESEditable *editable)
   return g_list_copy (GES_TIMELINE (editable)->priv->nleobjects);
 }
 
+static gboolean
+_set_track_index (GESEditable *editable, GESMediaType media_type, guint index)
+{
+  GESTimeline *self = GES_TIMELINE (editable);
+  GList *tmp;
+
+  for (tmp = self->priv->nleobjects; tmp; tmp = tmp->next)
+  {
+    GstCaps *caps;
+    GstStructure *structure;
+    GESMediaType object_type;
+    guint new_priority;
+
+    g_object_get (tmp->data, "caps", &caps, NULL);
+    structure = gst_caps_get_structure (caps, 0);
+    gst_caps_unref (caps);
+
+    if (gst_structure_has_name (structure, GES_RAW_AUDIO_CAPS))
+      object_type = GES_MEDIA_TYPE_AUDIO;
+    else if (gst_structure_has_name (structure, GES_RAW_VIDEO_CAPS))
+      object_type = GES_MEDIA_TYPE_VIDEO;
+    else
+      continue;
+
+    if (object_type & media_type) {
+      new_priority = (TRACK_PRIORITY_HEIGHT * index) + TIMELINE_PRIORITY_OFFSET;
+      g_object_set (tmp->data, "priority", new_priority, NULL);
+    }
+  }
+
+  return TRUE;
+}
+
 static void
 ges_editable_interface_init (GESEditableInterface * iface)
 {
@@ -88,6 +121,7 @@ ges_editable_interface_init (GESEditableInterface * iface)
   iface->set_duration = _set_duration;
   iface->set_start = _set_start;
   iface->get_nle_objects = _get_nle_objects;
+  iface->set_track_index = _set_track_index;
 }
 
 /* GESPlayable */
@@ -416,6 +450,7 @@ ges_timeline_add_editable (GESTimeline *self, GESEditable *editable)
 
     g_object_get (tmp->data, "caps", &caps, NULL);
     structure = gst_caps_get_structure (caps, 0);
+    gst_caps_unref (caps);
 
     if (gst_structure_has_name (structure, GES_RAW_AUDIO_CAPS))
       media_type = GES_MEDIA_TYPE_AUDIO;

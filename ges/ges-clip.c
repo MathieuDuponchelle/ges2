@@ -1,3 +1,4 @@
+#include "ges-timeline.h"
 #include "ges-clip.h"
 #include "ges-editable.h"
 #include "ges-playable.h"
@@ -207,6 +208,22 @@ _get_nle_objects (GESEditable *editable)
   return g_list_append (NULL, GES_CLIP (editable)->priv->nleobject);
 }
 
+static gboolean
+_set_track_index (GESEditable *editable, GESMediaType media_type, guint index)
+{
+  GESClip *self = GES_CLIP (editable);
+  guint new_priority;
+
+  if (!(media_type & self->priv->media_type))
+      return FALSE;
+
+  new_priority = (TRACK_PRIORITY_HEIGHT * index) + TIMELINE_PRIORITY_OFFSET;
+
+  g_object_set (self->priv->nleobject, "priority", new_priority, NULL);
+
+  return TRUE;
+}
+
 static void
 ges_editable_interface_init (GESEditableInterface * iface)
 {
@@ -214,6 +231,7 @@ ges_editable_interface_init (GESEditableInterface * iface)
   iface->set_duration = _set_duration;
   iface->set_start = _set_start;
   iface->get_nle_objects = _get_nle_objects;
+  iface->set_track_index = _set_track_index;
 }
 
 /* GObject initialization */

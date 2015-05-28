@@ -10,6 +10,7 @@ ges_editable_default_init (GESEditableInterface * iface)
   iface->set_duration = NULL;
   iface->set_start = NULL;
   iface->get_nle_objects = NULL;
+  iface->set_track_index = NULL;
 
   g_object_interface_install_property (iface,
       g_param_spec_flags ("media-type",
@@ -61,4 +62,15 @@ ges_editable_get_nle_objects (GESEditable *editable)
     return iface->get_nle_objects (editable);
 
   return NULL;
+}
+
+gboolean
+ges_editable_set_track_index (GESEditable *editable, GESMediaType media_type, guint index)
+{
+  GESEditableInterface *iface = GES_EDITABLE_GET_IFACE (editable);
+
+  if (iface->set_track_index)
+    return iface->set_track_index (editable, media_type, index);
+
+  return FALSE;
 }

@@ -12,6 +12,9 @@ G_BEGIN_DECLS
 
 #define GES_TYPE_TIMELINE (ges_timeline_get_type ())
 
+#define TIMELINE_PRIORITY_OFFSET 2
+#define TRACK_PRIORITY_HEIGHT 1000
+
 G_DECLARE_FINAL_TYPE(GESTimeline, ges_timeline, GES, TIMELINE, GstBin)
 
 GESTimeline *ges_timeline_new (GESMediaType media_type);

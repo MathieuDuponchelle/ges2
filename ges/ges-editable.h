@@ -19,6 +19,7 @@ struct _GESEditableInterface
   gboolean (*set_duration) (GESEditable *self, GstClockTime duration);
   gboolean (*set_start) (GESEditable *self, GstClockTime start);
   GList *  (*get_nle_objects) (GESEditable *self);
+  gboolean (*set_track_index) (GESEditable *self, GESMediaType media_type, guint index);
 
   GESMediaType media_type;
 };
@@ -27,6 +28,7 @@ gboolean ges_editable_set_inpoint (GESEditable *editable, GstClockTime inpoint);
 gboolean ges_editable_set_duration (GESEditable *editable, GstClockTime duration);
 gboolean ges_editable_set_start (GESEditable *editable, GstClockTime start);
 GList *  ges_editable_get_nle_objects (GESEditable *editable);
+gboolean ges_editable_set_track_index (GESEditable *editable, GESMediaType media_type, guint index);
 
 G_END_DECLS
 
