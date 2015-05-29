@@ -21,13 +21,13 @@ ges_playable_make_player (GESPlayable * playable)
   return player;
 }
 
-gboolean
+GstBin *
 ges_playable_make_playable (GESPlayable *playable, gboolean is_playable)
 {
   GESPlayableInterface *iface = GES_PLAYABLE_GET_IFACE (playable);
 
   if (!iface->make_playable)
-    return FALSE;
+    return NULL;
 
   return iface->make_playable (playable, is_playable);
 }

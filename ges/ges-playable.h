@@ -16,13 +16,13 @@ struct _GESPlayableInterface
 {
   GTypeInterface g_iface;
 
-  gboolean (*make_playable) (GESPlayable *, gboolean);
+  GstBin * (*make_playable) (GESPlayable *, gboolean);
 };
 
 GstPlayer *
 ges_playable_make_player (GESPlayable *playable); 
 
-gboolean
+GstBin *
 ges_playable_make_playable (GESPlayable *playable, gboolean is_playable);
 
 G_END_DECLS

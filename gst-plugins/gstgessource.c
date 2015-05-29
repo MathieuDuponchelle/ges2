@@ -46,6 +46,7 @@ GST_DEBUG_CATEGORY_STATIC (gstgessource);
 struct _GstGesSource {
   GstBin parent;
   GESPlayable *playable;
+  GstBin *playable_bin;
 };
 
 enum
@@ -79,11 +80,11 @@ gst_ges_source_set_playable (GstGesSource * self, GESPlayable *playable)
   }
 
   self->playable = playable;
-  ges_playable_make_playable (playable, TRUE);
+  self->playable_bin = ges_playable_make_playable (playable, TRUE);
 
-  pads = gst_element_iterate_src_pads (GST_ELEMENT (playable));
+  pads = gst_element_iterate_src_pads (GST_ELEMENT (self->playable_bin));
 
-  gst_bin_add (sbin, GST_ELEMENT (playable));
+  gst_bin_add (sbin, GST_ELEMENT (self->playable_bin));
 
   while (!done) {
     switch (gst_iterator_next (pads, &paditem)) {
@@ -199,8 +200,8 @@ _dispose (GObject *object)
   GstBin *sbin = GST_BIN (self);
 
   if (self->playable) {
-    gst_object_ref (self->playable);
-    gst_bin_remove (sbin, GST_ELEMENT (self->playable));
+    gst_object_ref (self->playable_bin);
+    gst_bin_remove (sbin, GST_ELEMENT (self->playable_bin));
     ges_playable_make_playable (self->playable, FALSE);
   }
 

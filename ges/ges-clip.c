@@ -14,18 +14,19 @@ typedef struct _GESClipPrivate
   GstPad *ghostpad;
   GstPad *static_sinkpad;
   guint track_index;
+  GstElement *playable_bin;
 } GESClipPrivate;
 
 struct _GESClip
 {
-  GstBin parent;
+  GObject parent;
   GESClipPrivate *priv;
 };
 
 static void ges_editable_interface_init (GESEditableInterface * iface);
 static void ges_playable_interface_init (GESPlayableInterface * iface);
 
-G_DEFINE_TYPE_WITH_CODE (GESClip, ges_clip, GST_TYPE_BIN,
+G_DEFINE_TYPE_WITH_CODE (GESClip, ges_clip, G_TYPE_OBJECT,
     G_IMPLEMENT_INTERFACE (GES_TYPE_EDITABLE, ges_editable_interface_init)
     G_IMPLEMENT_INTERFACE (GES_TYPE_PLAYABLE, ges_playable_interface_init))
 
@@ -137,7 +138,7 @@ _expose_nle_object (GESClip *self)
     gst_bin_remove (GST_BIN (self->priv->old_parent), self->priv->nleobject);
   }
 
-  gst_bin_add (GST_BIN (self), self->priv->nleobject);
+  gst_bin_add (GST_BIN (self->priv->playable_bin), self->priv->nleobject);
 
   pad = gst_element_get_static_pad (self->priv->nleobject, "src");
 
@@ -153,7 +154,7 @@ _unexpose_nle_object (GESClip *self)
 
   if (self->priv->old_parent) {
     gst_object_ref (self->priv->nleobject);
-    gst_bin_remove (GST_BIN (self), self->priv->nleobject);
+    gst_bin_remove (GST_BIN (self->priv->playable_bin), self->priv->nleobject);
     gst_bin_add (GST_BIN (self->priv->old_parent), self->priv->nleobject);
     gst_object_unref (self->priv->old_parent);
     self->priv->old_parent = NULL;
@@ -164,7 +165,7 @@ _unexpose_nle_object (GESClip *self)
 
 /* GESPlayable */
 
-static gboolean
+static GstBin *
 _make_playable (GESPlayable *playable, gboolean is_playable)
 {
   GESClip *self = GES_CLIP (playable);
@@ -174,7 +175,7 @@ _make_playable (GESPlayable *playable, gboolean is_playable)
   else
     _unexpose_nle_object (self);
 
-  return TRUE;
+  return GST_BIN (self->priv->playable_bin);
 }
 
 static void
@@ -367,8 +368,9 @@ ges_clip_init (GESClip *self)
       GES_TYPE_CLIP, GESClipPrivate);
 
   self->priv->old_parent = NULL;
+  self->priv->playable_bin = gst_bin_new (NULL);
   padname = g_strdup_printf ("clip_%p_src", self->priv->nleobject);
   self->priv->ghostpad = gst_ghost_pad_new_no_target (padname, GST_PAD_SRC);
   g_free (padname);
-  gst_element_add_pad (GST_ELEMENT (self), self->priv->ghostpad);
+  gst_element_add_pad (GST_ELEMENT (self->priv->playable_bin), self->priv->ghostpad);
 }

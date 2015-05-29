@@ -15,7 +15,7 @@ G_BEGIN_DECLS
 #define TIMELINE_PRIORITY_OFFSET 2
 #define TRACK_PRIORITY_HEIGHT 1000
 
-G_DECLARE_FINAL_TYPE(GESTimeline, ges_timeline, GES, TIMELINE, GstBin)
+G_DECLARE_FINAL_TYPE(GESTimeline, ges_timeline, GES, TIMELINE, GObject)
 
 GESTimeline *ges_timeline_new (GESMediaType media_type);
 gboolean ges_timeline_add_editable (GESTimeline *self, GESEditable *editable);
