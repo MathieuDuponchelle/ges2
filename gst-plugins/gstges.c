@@ -27,12 +27,20 @@
 
 #include <gst/gst.h>
 #include "gstgessource.h"
+#include "gstframepositioner.h"
+#include "ges-smart-video-mixer.h"
 
 static gboolean
 plugin_init (GstPlugin * plugin)
 {
-  return gst_element_register (plugin, "gessource", GST_RANK_NONE,
+  gst_element_register (plugin, "gessource", GST_RANK_NONE,
       GST_GES_SOURCE_TYPE);
+  gst_element_register (plugin, "framepositioner", GST_RANK_NONE,
+      GST_TYPE_FRAME_POSITIONNER);
+  gst_element_register (plugin, "smartvideomixer", GST_RANK_NONE,
+      GES_TYPE_SMART_MIXER);
+
+  return TRUE;
 }
 
 #define PACKAGE "gstreamer-editing-services"

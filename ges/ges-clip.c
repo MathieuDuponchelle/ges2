@@ -84,25 +84,30 @@ _make_nle_object (GESClip *self)
   g_free (given_name);
 
   if (self->priv->media_type == GES_MEDIA_TYPE_VIDEO) {
+    GstElement *framepositioner = gst_element_factory_make ("framepositioner", NULL);
+
+    GST_ERROR ("made frame positioner : %p", framepositioner);
     converter = gst_element_factory_make ("videoconvert", NULL);
     rate = gst_element_factory_make ("videorate", NULL);
-    gst_bin_add_many (GST_BIN(topbin), decodebin, converter, rate, NULL); 
-    gst_element_link (converter, rate);
+    gst_bin_add_many (GST_BIN(topbin), decodebin, converter, rate, framepositioner, NULL);
+    gst_element_link_many (converter, rate, framepositioner, NULL);
     g_object_set (self->priv->nleobject, "caps", gst_caps_from_string(GES_RAW_VIDEO_CAPS), NULL);
+    srcpad = gst_element_get_static_pad (framepositioner, "src");
   } else {
     converter = gst_element_factory_make ("audioconvert", NULL);
     rate = gst_element_factory_make ("audioresample", NULL);
     gst_bin_add_many (GST_BIN(topbin), decodebin, converter, rate, NULL); 
     gst_element_link (converter, rate);
     g_object_set (self->priv->nleobject, "caps", gst_caps_from_string(GES_RAW_AUDIO_CAPS), NULL);
+    srcpad = gst_element_get_static_pad (rate, "src");
   }
 
   self->priv->static_sinkpad = gst_element_get_static_pad (converter, "sink");
+
   g_signal_connect (decodebin, "pad-added",
       G_CALLBACK (_pad_added_cb),
       self);
 
-  srcpad = gst_element_get_static_pad (rate, "src");
   ghost = gst_ghost_pad_new ("src", srcpad);
   gst_pad_set_active (ghost, TRUE);
   gst_element_add_pad (topbin, ghost);

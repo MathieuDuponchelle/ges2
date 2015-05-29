@@ -321,10 +321,9 @@ _add_expandable_operation (GstElement *composition, const gchar *element_name, g
 }
 
 static void
-_add_expandable_source (GstElement *composition, const gchar *element_name, guint priority, const gchar *name)
+_add_expandable_source (GstElement *composition, GstElement *element, guint priority, const gchar *name)
 {
   GstElement *expandable = gst_element_factory_make ("nlesource", name);
-  GstElement *element = gst_element_factory_make (element_name, NULL);
 
   gst_bin_add (GST_BIN (expandable), element);
 
@@ -363,13 +362,18 @@ _make_nle_objects (GESTimeline *self)
   if (self->priv->media_type & GES_MEDIA_TYPE_AUDIO) {
     composition = _create_composition (self, GES_RAW_AUDIO_CAPS, "audio-composition");
     _add_expandable_operation (composition, "audiomixer", 0, "timeline-audiomixer");
-    _add_expandable_source (composition, "audiotestsrc", 1, "timeline-audio-background");
+    _add_expandable_source (composition, gst_element_factory_make ("videotestsrc", NULL), 1, "timeline-audio-background");
   }
 
   if (self->priv->media_type & GES_MEDIA_TYPE_VIDEO) {
+    GstElement *background = gst_parse_bin_from_description (
+        "videotestsrc ! framepositioner name=background_video_positioner", TRUE, NULL);
+    GstElement *pos = gst_bin_get_by_name (GST_BIN (background), "background_video_positioner");
+    g_object_set (pos, "alpha", 0.0, NULL);
+    gst_object_unref (pos);
     composition = _create_composition (self, GES_RAW_VIDEO_CAPS, "video-composition");
-    _add_expandable_operation (composition, "compositor", 0, "timeline-videomixer");
-    _add_expandable_source (composition, "videotestsrc", 1, "timeline-video-background");
+    _add_expandable_operation (composition, "smartvideomixer", 0, "timeline-videomixer");
+    _add_expandable_source (composition, background, 1, "timeline-video-background");
   }
 }
 
