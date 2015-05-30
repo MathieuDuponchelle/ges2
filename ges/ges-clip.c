@@ -1,6 +1,5 @@
 #include "ges-timeline.h"
 #include "ges-clip.h"
-#include "ges-editable.h"
 #include "ges-playable.h"
 
 /* Structure definitions */
@@ -8,7 +7,6 @@
 typedef struct _GESClipPrivate
 {
   gchar *uri;
-  GESMediaType media_type;
   GstElement *nleobject;
   GstObject *old_parent;
   GstPad *ghostpad;
@@ -19,42 +17,14 @@ typedef struct _GESClipPrivate
 
 struct _GESClip
 {
-  GObject parent;
+  GESObject parent;
   GESClipPrivate *priv;
 };
 
-static void ges_editable_interface_init (GESEditableInterface * iface);
 static void ges_playable_interface_init (GESPlayableInterface * iface);
 
-G_DEFINE_TYPE_WITH_CODE (GESClip, ges_clip, G_TYPE_OBJECT,
-    G_IMPLEMENT_INTERFACE (GES_TYPE_EDITABLE, ges_editable_interface_init)
+G_DEFINE_TYPE_WITH_CODE (GESClip, ges_clip, GES_TYPE_OBJECT,
     G_IMPLEMENT_INTERFACE (GES_TYPE_PLAYABLE, ges_playable_interface_init))
-
-/* API */
-
-GESMediaType
-ges_clip_get_media_type (GESClip *self)
-{
-  return self->priv->media_type;
-}
-
-void
-ges_clip_set_uri (GESClip *self, const gchar *uri)
-{
-  self->priv->uri = g_strdup (uri);
-}
-
-GESClip *
-ges_clip_new (const gchar *uri, GESMediaType media_type)
-{
-  return g_object_new (GES_TYPE_CLIP, "uri", uri, "media-type", media_type, NULL);
-}
-
-GstElement *
-ges_clip_get_nleobject (GESClip *self)
-{
-  return self->priv->nleobject;
-}
 
 /* Implementation */
 
@@ -66,7 +36,7 @@ _pad_added_cb (GstElement *element, GstPad *srcpad, GESClip *self)
 }
 
 static void
-_make_nle_object (GESClip *self)
+_make_nle_object (GESClip *self, GESMediaType media_type)
 {
   GstElement *decodebin, *rate, *converter;
   GstElement *topbin;
@@ -84,7 +54,7 @@ _make_nle_object (GESClip *self)
   g_free (actual_name);
   g_free (given_name);
 
-  if (self->priv->media_type == GES_MEDIA_TYPE_VIDEO) {
+  if (media_type == GES_MEDIA_TYPE_VIDEO) {
     GstElement *framepositioner = gst_element_factory_make ("framepositioner", NULL);
 
     GST_ERROR ("made frame positioner : %p", framepositioner);
@@ -115,7 +85,7 @@ _make_nle_object (GESClip *self)
 
   gst_object_unref (srcpad);
 
-  if (self->priv->media_type == GES_MEDIA_TYPE_VIDEO)
+  if (media_type == GES_MEDIA_TYPE_VIDEO)
     g_object_set (decodebin, "caps", gst_caps_from_string (GES_RAW_VIDEO_CAPS),
         "expose-all-streams", FALSE, "uri", self->priv->uri, NULL);
   else
@@ -184,12 +154,30 @@ ges_playable_interface_init (GESPlayableInterface * iface)
   iface->make_playable = _make_playable;
 }
 
-/* GESEditable */
+/* API */
+
+void
+ges_clip_set_uri (GESClip *self, const gchar *uri)
+{
+  if (self->priv->nleobject) {
+    GST_ERROR_OBJECT (self, "changing uri is not supported yet");
+  }
+
+  self->priv->uri = g_strdup (uri);
+}
+
+GESClip *
+ges_clip_new (const gchar *uri, GESMediaType media_type)
+{
+  return g_object_new (GES_TYPE_CLIP, "uri", uri, "media-type", media_type, NULL);
+}
+
+/* GESObject implementation */
 
 static gboolean
-_set_inpoint (GESEditable *editable, GstClockTime inpoint)
+_set_inpoint (GESObject *object, GstClockTime inpoint)
 {
-  GESClip *clip = GES_CLIP (editable);
+  GESClip *clip = GES_CLIP (object);
 
   g_object_set (clip->priv->nleobject, "inpoint", inpoint, NULL);
 
@@ -197,9 +185,9 @@ _set_inpoint (GESEditable *editable, GstClockTime inpoint)
 }
 
 static gboolean
-_set_duration (GESEditable *editable, GstClockTime duration)
+_set_duration (GESObject *object, GstClockTime duration)
 {
-  GESClip *clip = GES_CLIP (editable);
+  GESClip *clip = GES_CLIP (object);
 
   g_object_set (clip->priv->nleobject, "duration", duration, NULL);
 
@@ -207,94 +195,52 @@ _set_duration (GESEditable *editable, GstClockTime duration)
 }
 
 static gboolean
-_set_start (GESEditable *editable, GstClockTime start)
+_set_start (GESObject *object, GstClockTime start)
 {
-  GESClip *clip = GES_CLIP (editable);
+  GESClip *clip = GES_CLIP (object);
 
   g_object_set (clip->priv->nleobject, "start", start, NULL);
 
   return TRUE;
 }
 
-static GstClockTime
-_get_start (GESEditable *editable)
+static gboolean
+_set_media_type (GESObject *object, GESMediaType media_type)
 {
-  GstClockTime time;
-  GESClip *self = GES_CLIP (editable);
+  GESClip *self = GES_CLIP (object);
 
-  g_object_get (self->priv->nleobject, "start", &time, NULL);
+  if (self->priv->nleobject) {
+    GST_ERROR_OBJECT (object, "changing media type isn't supported yet");
+    return FALSE;
+  }
 
-  return time;
-}
+  if (self->priv->uri) {
+    _make_nle_object (self, media_type);
+  }
 
-static GstClockTime
-_get_inpoint (GESEditable *editable)
-{
-  GstClockTime time;
-  GESClip *self = GES_CLIP (editable);
-
-  g_object_get (self->priv->nleobject, "inpoint", &time, NULL);
-
-  return time;
-}
-
-static GstClockTime
-_get_duration (GESEditable *editable)
-{
-  GstClockTime time;
-  GESClip *self = GES_CLIP (editable);
-
-  g_object_get (self->priv->nleobject, "duration", &time, NULL);
-
-  return time;
+  return TRUE;
 }
 
 static GList *
-_get_nle_objects (GESEditable *editable)
+_get_nle_objects (GESObject *object)
 {
-  return g_list_append (NULL, GES_CLIP (editable)->priv->nleobject);
+  return g_list_append (NULL, GES_CLIP (object)->priv->nleobject);
 }
 
 static gboolean
-_set_track_index (GESEditable *editable, GESMediaType media_type, guint index)
+_set_track_index (GESObject *object, GESMediaType media_type, guint index)
 {
-  GESClip *self = GES_CLIP (editable);
+  GESClip *self = GES_CLIP (object);
   guint new_priority;
 
-  if (!(media_type & self->priv->media_type))
+  if (!(media_type & ges_object_get_media_type (object)))
       return FALSE;
 
   new_priority = (TRACK_PRIORITY_HEIGHT * index) + TIMELINE_PRIORITY_OFFSET;
 
   g_object_set (self->priv->nleobject, "priority", new_priority, NULL);
-  self->priv->track_index = index;
 
   return TRUE;
-}
-
-static guint
-_get_track_index (GESEditable *editable, GESMediaType media_type)
-{
-  GESClip *self = GES_CLIP (editable);
-
-  if (!(media_type & self->priv->media_type))
-      return G_MAXUINT;
-
-  return self->priv->track_index;
-}
-
-static void
-ges_editable_interface_init (GESEditableInterface * iface)
-{
-  iface->set_inpoint = _set_inpoint;
-  iface->set_duration = _set_duration;
-  iface->set_start = _set_start;
-  iface->get_inpoint = _get_inpoint;
-  iface->get_duration = _get_duration;
-  iface->get_start = _get_start;
-  iface->get_nle_objects = _get_nle_objects;
-  iface->set_track_index = _set_track_index;
-  iface->get_track_index = _get_track_index;
 }
 
 /* GObject initialization */
@@ -316,10 +262,6 @@ _set_property (GObject * object, guint property_id,
     case PROP_URI:
       ges_clip_set_uri (self, g_value_get_string (value));
       break;
-    case PROP_MEDIA_TYPE:
-      self->priv->media_type = g_value_get_flags (value);
-      _make_nle_object (self);
-      break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
   }
@@ -335,9 +277,6 @@ _get_property (GObject * object, guint property_id,
     case PROP_URI:
       g_value_set_string (value, priv->uri);
       break;
-    case PROP_MEDIA_TYPE:
-      g_value_set_flags (value, priv->media_type);
-      break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
   }
@@ -347,6 +286,7 @@ static void
 ges_clip_class_init (GESClipClass *klass)
 {
   GObjectClass *g_object_class = G_OBJECT_CLASS (klass);
+  GESObjectClass *ges_object_class = GES_OBJECT_CLASS (klass);
 
   g_type_class_add_private (klass, sizeof (GESClipPrivate));
 
@@ -357,7 +297,12 @@ ges_clip_class_init (GESClipClass *klass)
       g_param_spec_string ("uri", "URI", "uri of the resource", NULL,
           G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 
-  g_object_class_override_property (g_object_class, PROP_MEDIA_TYPE, "media-type");
+  ges_object_class->set_start = _set_start;
+  ges_object_class->set_duration = _set_duration;
+  ges_object_class->set_inpoint = _set_inpoint;
+  ges_object_class->set_media_type = _set_media_type;
+  ges_object_class->set_track_index = _set_track_index;
+  ges_object_class->get_nle_objects = _get_nle_objects;
 }
 
 static void

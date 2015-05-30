@@ -6,7 +6,6 @@
 
 #include "ges-clip.h"
 #include "ges-timeline.h"
-#include "ges-editable.h"
 #include "ges-playable.h"
 
 struct _elements_entry
@@ -46,13 +45,13 @@ test_sync (void)
   GESClip *audio_clip = ges_clip_new ("file:///home/meh/Videos/homeland.mp4", GES_MEDIA_TYPE_AUDIO);
   GESTimeline *timeline = ges_timeline_new(GES_MEDIA_TYPE_AUDIO | GES_MEDIA_TYPE_VIDEO);
 
-  ges_editable_set_inpoint (GES_EDITABLE (video_clip), 30 * GST_SECOND);
-  ges_editable_set_duration (GES_EDITABLE (video_clip), 10 * GST_SECOND);
-  ges_editable_set_inpoint (GES_EDITABLE (audio_clip), 2000 * GST_SECOND);
-  ges_editable_set_duration (GES_EDITABLE (audio_clip), 5 * GST_SECOND);
+  ges_object_set_inpoint (GES_OBJECT (video_clip), 30 * GST_SECOND);
+  ges_object_set_duration (GES_OBJECT (video_clip), 10 * GST_SECOND);
+  ges_object_set_inpoint (GES_OBJECT (audio_clip), 2000 * GST_SECOND);
+  ges_object_set_duration (GES_OBJECT (audio_clip), 5 * GST_SECOND);
 
-  ges_timeline_add_editable (timeline, video_clip);
-  ges_timeline_add_editable (timeline, audio_clip);
+  ges_timeline_add_object (timeline, video_clip);
+  ges_timeline_add_object (timeline, audio_clip);
   ges_timeline_commit (timeline);
 
   return timeline;
@@ -65,17 +64,17 @@ test_gaps (void)
   GESClip *audio_clip2 = ges_clip_new ("file:///home/meh/Videos/homeland.mp4", GES_MEDIA_TYPE_VIDEO);
   GESTimeline *timeline = ges_timeline_new(GES_MEDIA_TYPE_VIDEO);
 
-  ges_editable_set_duration (GES_EDITABLE (audio_clip1), 5 * GST_SECOND);
-  ges_editable_set_duration (GES_EDITABLE (audio_clip2), 5 * GST_SECOND);
+  ges_object_set_duration (GES_OBJECT (audio_clip1), 5 * GST_SECOND);
+  ges_object_set_duration (GES_OBJECT (audio_clip2), 5 * GST_SECOND);
 
-  ges_editable_set_inpoint (GES_EDITABLE (audio_clip1), 60 * GST_SECOND);
-  ges_editable_set_inpoint (GES_EDITABLE (audio_clip2), 60 * GST_SECOND);
+  ges_object_set_inpoint (GES_OBJECT (audio_clip1), 60 * GST_SECOND);
+  ges_object_set_inpoint (GES_OBJECT (audio_clip2), 60 * GST_SECOND);
 
-  ges_editable_set_start (GES_EDITABLE (audio_clip1), 0 * GST_SECOND);
-  ges_editable_set_start (GES_EDITABLE (audio_clip2), 10 * GST_SECOND);
+  ges_object_set_start (GES_OBJECT (audio_clip1), 0 * GST_SECOND);
+  ges_object_set_start (GES_OBJECT (audio_clip2), 10 * GST_SECOND);
 
-  ges_timeline_add_editable (timeline, audio_clip1);
-  ges_timeline_add_editable (timeline, audio_clip2);
+  ges_timeline_add_object (timeline, audio_clip1);
+  ges_timeline_add_object (timeline, audio_clip2);
   ges_timeline_commit (timeline);
 
   return timeline;
@@ -88,20 +87,20 @@ test_editable_timeline (void)
   GESClip *audio_clip2 = ges_clip_new ("file:///home/meh/Videos/homeland.mp4", GES_MEDIA_TYPE_VIDEO);
   GESTimeline *timeline = ges_timeline_new(GES_MEDIA_TYPE_VIDEO);
 
-  ges_editable_set_duration (GES_EDITABLE (audio_clip1), 5 * GST_SECOND);
-  ges_editable_set_duration (GES_EDITABLE (audio_clip2), 5 * GST_SECOND);
+  ges_object_set_duration (GES_OBJECT (audio_clip1), 5 * GST_SECOND);
+  ges_object_set_duration (GES_OBJECT (audio_clip2), 5 * GST_SECOND);
 
-  ges_editable_set_inpoint (GES_EDITABLE (audio_clip1), 60 * GST_SECOND);
-  ges_editable_set_inpoint (GES_EDITABLE (audio_clip2), 60 * GST_SECOND);
+  ges_object_set_inpoint (GES_OBJECT (audio_clip1), 60 * GST_SECOND);
+  ges_object_set_inpoint (GES_OBJECT (audio_clip2), 60 * GST_SECOND);
 
-  ges_editable_set_start (GES_EDITABLE (audio_clip1), 0 * GST_SECOND);
-  ges_editable_set_start (GES_EDITABLE (audio_clip2), 10 * GST_SECOND);
+  ges_object_set_start (GES_OBJECT (audio_clip1), 0 * GST_SECOND);
+  ges_object_set_start (GES_OBJECT (audio_clip2), 10 * GST_SECOND);
 
-  ges_timeline_add_editable (timeline, audio_clip1);
-  ges_timeline_add_editable (timeline, audio_clip2);
+  ges_timeline_add_object (timeline, audio_clip1);
+  ges_timeline_add_object (timeline, audio_clip2);
 
-  ges_editable_set_inpoint (GES_EDITABLE (timeline), 3 * GST_SECOND);
-  ges_editable_set_duration (GES_EDITABLE (timeline), 15 * GST_SECOND);
+  ges_object_set_inpoint (GES_OBJECT (timeline), 3 * GST_SECOND);
+  ges_object_set_duration (GES_OBJECT (timeline), 15 * GST_SECOND);
 
   ges_timeline_commit (timeline);
 
@@ -116,20 +115,20 @@ test_timeline_nesting (void)
   GESTimeline *timeline1 = ges_timeline_new(GES_MEDIA_TYPE_VIDEO);
   GESTimeline *timeline2 = ges_timeline_new(GES_MEDIA_TYPE_VIDEO);
 
-  ges_editable_set_duration (GES_EDITABLE (audio_clip1), 5 * GST_SECOND);
-  ges_editable_set_duration (GES_EDITABLE (audio_clip2), 5 * GST_SECOND);
+  ges_object_set_duration (GES_OBJECT (audio_clip1), 5 * GST_SECOND);
+  ges_object_set_duration (GES_OBJECT (audio_clip2), 5 * GST_SECOND);
 
-  ges_editable_set_inpoint (GES_EDITABLE (audio_clip1), 60 * GST_SECOND);
-  ges_editable_set_inpoint (GES_EDITABLE (audio_clip2), 60 * GST_SECOND);
+  ges_object_set_inpoint (GES_OBJECT (audio_clip1), 60 * GST_SECOND);
+  ges_object_set_inpoint (GES_OBJECT (audio_clip2), 60 * GST_SECOND);
 
-  ges_timeline_add_editable (timeline1, audio_clip1);
-  ges_timeline_add_editable (timeline2, audio_clip2);
+  ges_timeline_add_object (timeline1, audio_clip1);
+  ges_timeline_add_object (timeline2, audio_clip2);
 
-  ges_editable_set_duration (GES_EDITABLE (timeline1), 5 * GST_SECOND);
-  ges_editable_set_start (GES_EDITABLE (timeline1), 5 * GST_SECOND);
+  ges_object_set_duration (GES_OBJECT (timeline1), 5 * GST_SECOND);
+  ges_object_set_start (GES_OBJECT (timeline1), 5 * GST_SECOND);
 
-  ges_timeline_add_editable (timeline2, GES_EDITABLE (timeline1));
-  ges_editable_set_duration (GES_EDITABLE (timeline2), 10 * GST_SECOND);
+  ges_timeline_add_object (timeline2, GES_OBJECT (timeline1));
+  ges_object_set_duration (GES_OBJECT (timeline2), 10 * GST_SECOND);
 
   ges_timeline_commit (timeline2);
 
@@ -171,8 +170,8 @@ test_playable_clip (void)
 {
   GESClip *video_clip = ges_clip_new ("file:///home/meh/Videos/homeland.mp4", GES_MEDIA_TYPE_VIDEO);
 
-  ges_editable_set_duration (GES_EDITABLE (video_clip), 5 * GST_SECOND);
-  ges_editable_set_inpoint (GES_EDITABLE (video_clip), 60 * GST_SECOND);
+  ges_object_set_duration (GES_OBJECT (video_clip), 5 * GST_SECOND);
+  ges_object_set_inpoint (GES_OBJECT (video_clip), 60 * GST_SECOND);
 
   play_playable (GES_PLAYABLE (video_clip));
 }
@@ -185,18 +184,18 @@ test_play_clip_in_timeline (void)
   GST_ERROR_OBJECT (timeline, "zis is ze timeline");
   GESTimeline *timeline2 = ges_timeline_new (GES_MEDIA_TYPE_VIDEO);
 
-  ges_editable_set_duration (GES_EDITABLE (video_clip), 5 * GST_SECOND);
-  ges_editable_set_inpoint (GES_EDITABLE (video_clip), 60 * GST_SECOND);
+  ges_object_set_duration (GES_OBJECT (video_clip), 5 * GST_SECOND);
+  ges_object_set_inpoint (GES_OBJECT (video_clip), 60 * GST_SECOND);
 
-  ges_timeline_add_editable (timeline, GES_EDITABLE (video_clip));
-  ges_timeline_add_editable (timeline2, GES_EDITABLE (timeline));
+  ges_timeline_add_object (timeline, GES_OBJECT (video_clip));
+  ges_timeline_add_object (timeline2, GES_OBJECT (timeline));
 
-  ges_editable_set_start (GES_EDITABLE (timeline), 5 * GST_SECOND);
-  ges_editable_set_duration (GES_EDITABLE (timeline), 5 * GST_SECOND);
-  ges_editable_set_inpoint (GES_EDITABLE (timeline), 0 * GST_SECOND);
+  ges_object_set_start (GES_OBJECT (timeline), 5 * GST_SECOND);
+  ges_object_set_duration (GES_OBJECT (timeline), 5 * GST_SECOND);
+  ges_object_set_inpoint (GES_OBJECT (timeline), 0 * GST_SECOND);
 
-  ges_editable_set_inpoint (GES_EDITABLE (timeline2), 0 * GST_SECOND);
-  ges_editable_set_duration (GES_EDITABLE (timeline2), 10 * GST_SECOND);
+  ges_object_set_inpoint (GES_OBJECT (timeline2), 0 * GST_SECOND);
+  ges_object_set_duration (GES_OBJECT (timeline2), 10 * GST_SECOND);
 
   ges_timeline_commit (timeline2);
 
@@ -212,17 +211,17 @@ test_transitions ()
   GESClip *video_clip2 = ges_clip_new ("file:///home/meh/Videos/homeland.mp4", GES_MEDIA_TYPE_VIDEO);
   GESTimeline *timeline = ges_timeline_new(GES_MEDIA_TYPE_VIDEO);
 
-  ges_editable_set_duration (GES_EDITABLE (video_clip1), 5 * GST_SECOND);
-  ges_editable_set_duration (GES_EDITABLE (video_clip2), 5 * GST_SECOND);
+  ges_object_set_duration (GES_OBJECT (video_clip1), 5 * GST_SECOND);
+  ges_object_set_duration (GES_OBJECT (video_clip2), 5 * GST_SECOND);
 
-  ges_editable_set_inpoint (GES_EDITABLE (video_clip1), 60 * GST_SECOND);
-  ges_editable_set_inpoint (GES_EDITABLE (video_clip2), 150 * GST_SECOND);
+  ges_object_set_inpoint (GES_OBJECT (video_clip1), 60 * GST_SECOND);
+  ges_object_set_inpoint (GES_OBJECT (video_clip2), 150 * GST_SECOND);
 
-  ges_editable_set_start (GES_EDITABLE (video_clip1), 0 * GST_SECOND);
-  ges_editable_set_start (GES_EDITABLE (video_clip2), 2 * GST_SECOND);
+  ges_object_set_start (GES_OBJECT (video_clip1), 0 * GST_SECOND);
+  ges_object_set_start (GES_OBJECT (video_clip2), 2 * GST_SECOND);
 
-  ges_timeline_add_editable (timeline, GES_EDITABLE (video_clip1));
-  ges_timeline_add_editable (timeline, GES_EDITABLE (video_clip2));
+  ges_timeline_add_object (timeline, GES_OBJECT (video_clip1));
+  ges_timeline_add_object (timeline, GES_OBJECT (video_clip2));
 
   ges_timeline_commit (timeline);
 
