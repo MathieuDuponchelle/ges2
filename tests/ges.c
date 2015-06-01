@@ -243,7 +243,6 @@ int main (int ac, char **av)
     test_playable_clip ();
     test_play_clip_in_timeline ();
   } else {
-    test_playable_clip ();
     timeline = test_transitions ();
   }
 

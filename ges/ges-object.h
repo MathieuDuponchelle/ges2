@@ -36,6 +36,10 @@ gboolean ges_object_set_duration    (GESObject *self, GstClockTime duration);
 gboolean ges_object_set_start       (GESObject *self, GstClockTime start);
 gboolean ges_object_set_track_index (GESObject *self, GESMediaType media_type, guint track_index);
 
+GstControlSource *
+ges_object_get_interpolation_control_source (GESObject * object,
+    const gchar * property_name, GType binding_type);
+
 G_END_DECLS
 
 #endif

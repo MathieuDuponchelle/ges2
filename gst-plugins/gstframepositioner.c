@@ -209,7 +209,7 @@ gst_frame_positionner_class_init (GstFramePositionnerClass * klass)
 static void
 gst_frame_positionner_init (GstFramePositionner * framepositionner)
 {
-  framepositionner->alpha = 0.2;
+  framepositionner->alpha = 1.0;
   framepositionner->posx = 0.0;
   framepositionner->posy = 0.0;
   framepositionner->zorder = 0;

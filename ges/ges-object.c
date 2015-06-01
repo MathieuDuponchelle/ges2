@@ -1,3 +1,4 @@
+#include "gst/controller/controller.h"
 #include "ges-object.h"
 
 #define GES_OBJECT_PRIV(self) (ges_object_get_instance_private (GES_OBJECT (self)))
@@ -11,9 +12,14 @@ typedef struct _GESObjectPrivate
   GstClockTime duration;
   GstClockTime start;
   guint track_index;
+  GList *children;
 } GESObjectPrivate;
 
-G_DEFINE_TYPE_WITH_PRIVATE (GESObject, ges_object, G_TYPE_OBJECT)
+static void ges_object_child_proxy_init (GstChildProxyInterface * iface);
+
+G_DEFINE_TYPE_WITH_CODE (GESObject, ges_object, G_TYPE_OBJECT,
+    G_ADD_PRIVATE (GESObject)
+    G_IMPLEMENT_INTERFACE (GST_TYPE_CHILD_PROXY, ges_object_child_proxy_init))
 
 /* API */
 
@@ -143,6 +149,159 @@ ges_object_get_nle_objects (GESObject *self)
   return NULL;
 }
 
+static gchar *
+_get_base_property_name (const gchar * name)
+{
+  gchar **names, **current;
+  gchar *prop_name = NULL;
+
+  names = current = g_strsplit (name, "::", -1);
+
+  while (*current) {
+    if (!current[1]) {
+      prop_name = g_strdup (*current);
+      g_free (*current);
+      *current = NULL;
+    }
+    current++;
+  }
+
+  g_strfreev (names);
+
+  return prop_name;
+}
+
+static GObject *
+_lookup_element_for_property (GESObject *self, const gchar *property_name, GParamSpec **pspec)
+{
+  GList *objects = gst_child_proxy_lookup_all (GST_CHILD_PROXY (self), property_name);
+  GObject *object;
+  GObjectClass *klass;
+  gchar *base_property_name;
+
+  if (!objects) {
+    GST_ERROR_OBJECT (self, "No such property %s in any of the elements we contain", property_name);
+    return NULL;
+  }
+
+  if (g_list_length (objects) != 1) {
+    GST_ERROR_OBJECT (self, "Too many objects expose a %s property, please be more specific, see gst_child_proxy_lookup_all documentation", property_name);
+    g_list_free_full (objects, g_object_unref);
+    return NULL;
+  }
+
+  base_property_name = _get_base_property_name (property_name);
+
+  object = g_object_ref (objects->data);
+  g_list_free_full (objects, g_object_unref);
+  klass = G_OBJECT_GET_CLASS (object);
+
+  *pspec = g_object_class_find_property (klass, base_property_name);
+  g_free (base_property_name);
+
+  return object;
+}
+
+GstControlSource *
+ges_object_get_interpolation_control_source (GESObject * self,
+    const gchar * property_name, GType binding_type)
+{
+  GParamSpec *pspec = NULL;
+  GstControlSource *source = NULL;
+  GstControlBinding *binding;
+  GObject *object = _lookup_element_for_property (self, property_name, &pspec);
+  gchar *base_property_name = _get_base_property_name (property_name);
+
+  if (!object)
+    goto beach;
+
+  if (!GST_IS_OBJECT (object)) {
+    GST_ERROR_OBJECT (self, "can't control a %s as it is not a GstObject", G_OBJECT_TYPE_NAME (object));
+    goto beach;
+  }
+
+  if ((binding = gst_object_get_control_binding (GST_OBJECT (object), base_property_name))) {
+    g_object_get (binding, "control-source", &source, NULL);
+    g_object_unref (binding);
+    goto beach;
+  }
+
+  if (binding_type != G_TYPE_NONE && binding_type != GST_TYPE_DIRECT_CONTROL_BINDING) {
+    GST_ERROR_OBJECT (self, "We only support direct control bindings for now");
+    goto beach;
+  }
+
+  source = gst_interpolation_control_source_new ();
+  binding = gst_direct_control_binding_new (GST_OBJECT (object), base_property_name, source);
+
+  if (!binding) {
+    g_object_unref (source);
+    source = NULL;
+    goto beach;
+  }
+
+  gst_object_add_control_binding (GST_OBJECT (object), binding);
+
+beach:
+  g_free (base_property_name);
+  return source;
+}
+
+/* GstChildProxy implementation */
+
+static guint
+_get_children_count (GstChildProxy *proxy)
+{
+  GESObjectPrivate *priv = GES_OBJECT_PRIV (proxy);
+
+  return g_list_length (priv->children);
+}
+
+static GObject *
+_get_child_by_index (GstChildProxy *proxy, guint index)
+{
+  GESObjectPrivate *priv = GES_OBJECT_PRIV (proxy);
+
+  return g_object_ref (g_list_nth_data (priv->children, index));
+}
+
+static void
+_child_added (GstChildProxy *proxy, GObject *child, const gchar *name)
+{
+  GESObjectPrivate *priv = GES_OBJECT_PRIV (proxy);
+
+  priv->children = g_list_append (priv->children, child);
+}
+
+static void
+_child_removed (GstChildProxy *proxy, GObject *child, const gchar *name)
+{
+  GESObjectPrivate *priv = GES_OBJECT_PRIV (proxy);
+
+  priv->children = g_list_remove (priv->children, child);
+}
+
+static gchar *
+_get_object_name (GstChildProxy *proxy, GObject *child)
+{
+  if (GES_IS_OBJECT (child))
+    return g_strdup (""); /* FIXME */
+  else if (GST_IS_OBJECT (child))
+    return gst_object_get_name (GST_OBJECT (child));
+  else
+    return NULL;
+}
+
+static void
+ges_object_child_proxy_init (GstChildProxyInterface *iface)
+{
+  iface->get_children_count = _get_children_count;
+  iface->get_child_by_index = _get_child_by_index;
+  iface->child_added = _child_added;
+  iface->child_removed = _child_removed;
+  iface->get_object_name = _get_object_name;
+}
+
 /* GObject initialization */
 
 enum
@@ -241,4 +400,7 @@ ges_object_class_init (GESObjectClass *klass)
 static void
 ges_object_init (GESObject *self)
 {
+  GESObjectPrivate *priv = GES_OBJECT_PRIV (self);
+
+  priv->children = NULL;
 }

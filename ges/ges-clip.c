@@ -55,15 +55,15 @@ _make_nle_object (GESClip *self, GESMediaType media_type)
   g_free (given_name);
 
   if (media_type == GES_MEDIA_TYPE_VIDEO) {
-    GstElement *framepositioner = gst_element_factory_make ("framepositioner", NULL);
+    GstElement *framepositioner = gst_element_factory_make ("framepositioner", "framepositioner");
 
-    GST_ERROR ("made frame positioner : %p", framepositioner);
     converter = gst_element_factory_make ("videoconvert", NULL);
     rate = gst_element_factory_make ("videorate", NULL);
     gst_bin_add_many (GST_BIN(topbin), decodebin, converter, rate, framepositioner, NULL);
     gst_element_link_many (converter, rate, framepositioner, NULL);
     g_object_set (self->priv->nleobject, "caps", gst_caps_from_string(GES_RAW_VIDEO_CAPS), NULL);
     srcpad = gst_element_get_static_pad (framepositioner, "src");
+    gst_child_proxy_child_added (GST_CHILD_PROXY (self), G_OBJECT (framepositioner), "framepositioner");
   } else {
     converter = gst_element_factory_make ("audioconvert", NULL);
     rate = gst_element_factory_make ("audioresample", NULL);
