@@ -363,12 +363,14 @@ _execute_actions (NleComposition * comp)
     g_value_set_object (&params[0], comp);
 
     lact = priv->actions;
-    priv->actions = priv->actions->next;
+    priv->actions = g_list_remove_link (priv->actions, lact);
     ACTIONS_UNLOCK (comp);
 
     GST_INFO_OBJECT (comp, "Invoking %p:%s",
         lact->data, GST_DEBUG_FUNCPTR_NAME ((ACTION_CALLBACK (lact->data))));
     g_closure_invoke (lact->data, NULL, 1, params, NULL);
+    g_closure_unref (lact->data);
+    g_list_free (lact);
     g_value_unset (&params[0]);
   } else {
     ACTIONS_UNLOCK (comp);
@@ -393,6 +395,7 @@ _start_task (NleComposition * comp)
 
     task = gst_task_new ((GstTaskFunction) _execute_actions, comp, NULL);
     gst_object_set_name (GST_OBJECT_CAST (task), taskname);
+    g_free (taskname);
     gst_task_set_lock (task, GET_TASK_LOCK (comp));
     GST_DEBUG_OBJECT (comp, "created task %p", task);
     comp->task = task;
@@ -753,7 +756,6 @@ _add_action (NleComposition * comp, GCallback func,
 {
   Action *action;
   NleCompositionPrivate *priv = comp->priv;
-
 
   action = (Action *) g_closure_new_simple (sizeof (Action), data);
   g_closure_add_finalize_notifier ((GClosure *) action, data,
@@ -1639,8 +1641,10 @@ nle_composition_reset_target_pad (NleComposition * comp)
     GstPad *target;
 
     target = gst_ghost_pad_get_target ((GstGhostPad *) NLE_OBJECT_SRC (comp));
-    if (target)
+    if (target) {
       gst_pad_remove_probe (target, priv->ghosteventprobe);
+      gst_object_unref (target);
+    }
     priv->ghosteventprobe = 0;
   }
 
@@ -2489,7 +2493,7 @@ _link_to_parent (NleComposition * comp, NleObject * newobj,
   GstPad *sinkpad;
 
   /* relink to new parent in required order */
-  GST_LOG_OBJECT (comp, "Linking %s and %s",
+  GST_DEBUG_OBJECT (comp, "Linking %s and %s",
       GST_ELEMENT_NAME (GST_ELEMENT (newobj)),
       GST_ELEMENT_NAME (GST_ELEMENT (newparent)));
 
@@ -2787,15 +2791,17 @@ static gboolean
 _print_stack (GNode *node, gpointer unused)
 {
   NleObject *obj = NLE_OBJECT (node->data);
-  g_print ("%*s %d\n", g_node_depth (node) * 4, gst_object_get_name (GST_OBJECT (obj)), obj->priority);
+  gchar *name = gst_object_get_name (GST_OBJECT (obj));
 
+  g_print ("%*s %d\n", g_node_depth (node) * 4, name, obj->priority);
+
+  g_free (name);
   return FALSE;
 }
 
 static void
 _dump_stack (GNode *stack)
 {
-  GST_ERROR ("dumping stack now");
   g_node_traverse (stack, G_LEVEL_ORDER, G_TRAVERSE_ALL, -1, _print_stack, NULL);
 }
 
@@ -2911,18 +2917,16 @@ update_pipeline (NleComposition * comp, GstClockTime currenttime, gint32 seqnum,
   GST_INFO_OBJECT (comp, "Setting current stack [%" GST_TIME_FORMAT " - %"
       GST_TIME_FORMAT "]", GST_TIME_ARGS (priv->segment_start),
       GST_TIME_ARGS (priv->segment_stop));
+
+  if (priv->current)
+    g_node_destroy (priv->current);
+
   priv->current = stack;
 
   if (priv->current) {
-    UpdateCompositionData *ucompo = g_slice_new0 (UpdateCompositionData);
-
     GST_INFO_OBJECT (comp, "New stack set and ready to run, probing src pad"
         " and stopping children thread until we are actually ready with"
         " that new stack");
-
-    ucompo->comp = comp;
-    ucompo->reason = update_reason;
-    ucompo->seqnum = seqnum;
 
     comp->priv->updating_reason = update_reason;
     comp->priv->seqnum_to_restart_task = seqnum;

@@ -665,6 +665,7 @@ static gboolean
 remove_sink_pad (NleOperation * operation, GstPad * sinkpad)
 {
   gboolean ret = TRUE;
+  gboolean unref_pad = FALSE;
 
   GST_DEBUG ("sinkpad %s:%s", GST_DEBUG_PAD_NAME (sinkpad));
 
@@ -680,6 +681,7 @@ remove_sink_pad (NleOperation * operation, GstPad * sinkpad)
       ret = FALSE;
       goto beach;
     }
+    unref_pad = TRUE;
   }
 
   if (sinkpad) {
@@ -695,6 +697,8 @@ remove_sink_pad (NleOperation * operation, GstPad * sinkpad)
     operation->sinks = g_list_remove (operation->sinks, sinkpad);
     nle_object_remove_ghost_pad ((NleObject *) operation, sinkpad);
     operation->realsinks--;
+    if (unref_pad)
+      gst_object_unref (sinkpad);
   }
 
 beach:
@@ -766,7 +770,7 @@ nle_operation_hard_cleanup (NleOperation * operation)
         GstPad *srcpad = gst_pad_get_peer (sinkpad);
 
         if (srcpad) {
-          GST_ERROR ("Unlinking %" GST_PTR_FORMAT " and  %"
+          GST_DEBUG ("Unlinking %" GST_PTR_FORMAT " and  %"
               GST_PTR_FORMAT, srcpad, sinkpad);
           gst_pad_unlink (srcpad, sinkpad);
         }
@@ -783,6 +787,9 @@ nle_operation_hard_cleanup (NleOperation * operation)
         break;
     }
   }
+
+  g_value_unset (&item);
+  gst_iterator_free (pads);
   nle_object_cleanup (NLE_OBJECT (operation));
 }
 

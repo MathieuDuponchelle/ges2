@@ -592,14 +592,15 @@ nle_object_change_state (GstElement * element, GstStateChange transition)
       /* Going to READY and if we are not in a composition, we need to make
        * sure that the object positioning state is properly commited  */
       if (parent) {
-        if (g_strcmp0 (gst_element_get_name (GST_ELEMENT (parent)),
-                "current-bin")
+        gchar *name = gst_element_get_name (GST_ELEMENT (parent));
+        if (g_strcmp0 (name, "current-bin")
             && !NLE_OBJECT_IS_COMPOSITION (NLE_OBJECT (element))) {
           GST_INFO ("Adding nleobject to something that is not a composition,"
               " commiting ourself");
           nle_object_commit (NLE_OBJECT (element), FALSE);
         }
 
+        g_free (name);
         gst_object_unref (parent);
       }
     }
