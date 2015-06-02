@@ -174,7 +174,6 @@ ges_smart_mixer_dispose (GObject * object)
 {
   GESSmartMixer *self = GES_SMART_MIXER (object);
 
-  GST_ERROR ("mixer disposed");
   if (self->pads_infos != NULL) {
     g_hash_table_unref (self->pads_infos);
     self->pads_infos = NULL;

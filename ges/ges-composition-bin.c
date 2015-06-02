@@ -65,7 +65,7 @@ _expose_nle_objects (GESCompositionBin *self)
     }
 
     g_object_get (tmp->data, "caps", &caps, NULL);
-    g_object_set (capsfilter, "caps", gst_caps_copy (caps), NULL);
+    g_object_set (capsfilter, "caps", caps, NULL);
     gst_caps_unref (caps);
 
     gst_bin_add_many (GST_BIN (self), capsfilter, tmp->data, NULL);
@@ -78,6 +78,7 @@ _expose_nle_objects (GESCompositionBin *self)
         GST_PAD_PROBE_TYPE_EVENT_DOWNSTREAM,
         (GstPadProbeCallback) _pad_probe_cb, self, NULL);
 
+    gst_object_unref(pad); 
     gpads = gpads->next;
   }
 
@@ -233,12 +234,30 @@ ges_composition_bin_new (void)
 /* GObject initialization */
 
 static void
+_dispose (GObject *object)
+{
+  GESCompositionBin *self = GES_COMPOSITION_BIN (object);
+  GList *tmp;
+
+  for (tmp = self->priv->ghostpads; tmp; tmp = tmp->next) {
+    gst_ghost_pad_set_target (GST_GHOST_PAD (tmp->data), NULL);
+  }
+
+  g_list_free (self->priv->nleobjects);
+  g_list_free (self->priv->ghostpads);
+
+  G_OBJECT_CLASS (ges_composition_bin_parent_class)->dispose (object);
+}
+
+static void
 ges_composition_bin_class_init (GESCompositionBinClass *klass)
 {
   GstBinClass *bin_class = GST_BIN_CLASS (klass);
+  GObjectClass *g_object_class = G_OBJECT_CLASS (klass);
 
   g_type_class_add_private (klass, sizeof (GESCompositionBinPrivate));
 
+  g_object_class->dispose = _dispose;
   bin_class->handle_message = GST_DEBUG_FUNCPTR (ges_composition_bin_handle_message);
 }
 

@@ -123,7 +123,7 @@ static void
 _unexpose_nle_object (GESClip *self)
 {
   gst_ghost_pad_set_target (GST_GHOST_PAD (self->priv->ghostpad), NULL);
-    gst_pad_set_active (GST_PAD (self->priv->ghostpad), FALSE);
+  gst_pad_set_active (GST_PAD (self->priv->ghostpad), FALSE);
 
   if (self->priv->old_parent) {
     gst_object_ref (self->priv->nleobject);

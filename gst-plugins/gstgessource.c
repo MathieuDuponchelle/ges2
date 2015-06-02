@@ -93,7 +93,6 @@ gst_ges_source_set_playable (GstGesSource * self, GESPlayable *playable)
         GstPad *gpad;
         GstPad *pad = g_value_get_object (&paditem);
 
-        GST_ERROR_OBJECT (pad, "adding pad to bin : %s", gst_caps_to_string(gst_pad_query_caps (pad, NULL)));
         gpad = gst_ghost_pad_new (NULL, pad);
 
         gst_pad_set_active (gpad, TRUE);
