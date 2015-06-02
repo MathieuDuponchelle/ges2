@@ -22,6 +22,7 @@ GST_START_TEST (test_tracks)
   ges_timeline_add_object (timeline, GES_OBJECT (video_clip2));
 
   ges_timeline_commit (timeline);
+  g_object_unref (timeline);
 }
 
 GST_END_TEST

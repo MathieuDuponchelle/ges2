@@ -106,10 +106,12 @@ _create_composition (GESTimeline *self, const gchar *caps_string, const gchar *n
 {
   GstElement *composition = gst_element_factory_make ("nlecomposition", name);
   GstElement *wrapper = gst_element_factory_make ("nlesource", NULL);
+  GstCaps *caps = gst_caps_from_string (caps_string);
 
   GST_DEBUG_OBJECT (self, "creating composition %s with caps %s", name, caps_string);
-  g_object_set (composition, "caps", gst_caps_from_string (caps_string), NULL);
-  g_object_set (wrapper, "caps", gst_caps_from_string (caps_string), NULL);
+  g_object_set (composition, "caps", caps, NULL);
+  g_object_set (wrapper, "caps", caps, NULL);
+  gst_caps_unref (caps);
 
   gst_bin_add (GST_BIN (wrapper), composition);
 
@@ -128,6 +130,19 @@ _add_track (GESTimeline *self, GESMediaType media_type)
   track->objects_by_start = g_sequence_new (NULL);
   tracks = g_list_append (tracks, track);
   g_hash_table_replace (self->priv->tracks, GINT_TO_POINTER (media_type), tracks);
+}
+
+static void
+_free_track (GESTrack *track)
+{
+  g_sequence_free (track->objects_by_start);
+  g_free (track);
+}
+
+static void
+_free_tracks (GESMediaType *unused, GList *tracks, gpointer unused_data)
+{
+  g_list_free_full (tracks, (GDestroyNotify) _free_track);
 }
 
 static void
@@ -150,7 +165,7 @@ _make_nle_objects (GESTimeline *self, GESMediaType media_type)
     gst_object_unref (pos);
     composition = _create_composition (self, GES_RAW_VIDEO_CAPS, "video-composition");
     _add_expandable_operation (composition, "smartvideomixer", 0, "timeline-videomixer");
-    //_add_expandable_source (composition, background, 1, "timeline-video-background");
+    _add_expandable_source (composition, background, 1, "timeline-video-background");
     _add_track (self, GES_MEDIA_TYPE_VIDEO);
   }
 }
@@ -236,11 +251,6 @@ static void
 _update_transitions (GESTimeline *self)
 {
   _update_transitions_for_media_type (self, GES_MEDIA_TYPE_VIDEO);
-  GSequenceIter *first = g_sequence_get_begin_iter (self->priv->object_by_start);
-  GstControlSource *source;
-
-  GESClip *clip = GES_CLIP (g_sequence_get (first));
-  source = ges_object_get_interpolation_control_source (GES_OBJECT (clip), "framepositioner::alpha", G_TYPE_NONE);
 }
 
 static void
@@ -423,7 +433,8 @@ ges_timeline_add_object (GESTimeline *self, GESObject *object)
   if (ges_object_get_media_type (object) & GES_MEDIA_TYPE_AUDIO)
     _add_object_to_track (self, object, GES_MEDIA_TYPE_AUDIO);
 
-  g_sequence_insert_sorted (self->priv->object_by_start, object, (GCompareDataFunc) _compare_starts, NULL);
+  g_sequence_insert_sorted (self->priv->object_by_start, g_object_ref_sink (object), (GCompareDataFunc) _compare_starts, NULL);
+  g_list_free (nleobjects);
   return TRUE;
 }
 
@@ -491,6 +502,21 @@ _get_property (GObject * object, guint property_id,
 }
 
 static void
+_dispose (GObject *object)
+{
+  GESTimeline *self = GES_TIMELINE (object);
+
+  g_sequence_free (self->priv->object_by_start);
+  g_hash_table_foreach (self->priv->tracks, (GHFunc) _free_tracks, NULL);
+  g_hash_table_unref (self->priv->tracks);
+  g_list_free_full (self->priv->nleobjects, gst_object_unref);
+  g_list_free (self->priv->compositions);
+  gst_object_unref (self->priv->composition_bin);
+
+  G_OBJECT_CLASS (ges_timeline_parent_class)->dispose (object);
+}
+
+static void
 ges_timeline_class_init (GESTimelineClass *klass)
 {
   GObjectClass *g_object_class = G_OBJECT_CLASS (klass);
@@ -500,6 +526,7 @@ ges_timeline_class_init (GESTimelineClass *klass)
 
   g_object_class->set_property = _set_property;
   g_object_class->get_property = _get_property;
+  g_object_class->dispose = _dispose;
 
   ges_object_class->set_inpoint = _set_inpoint;
   ges_object_class->set_duration = _set_duration;
@@ -518,6 +545,6 @@ ges_timeline_init (GESTimeline *self)
   self->priv->compositions = NULL;
   self->priv->nleobjects = NULL;
   self->priv->composition_bin = ges_composition_bin_new ();
-  self->priv->object_by_start = g_sequence_new (NULL);
+  self->priv->object_by_start = g_sequence_new (g_object_unref);
   self->priv->tracks = g_hash_table_new (g_direct_hash, g_direct_equal);
 }

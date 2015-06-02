@@ -9,7 +9,7 @@ G_BEGIN_DECLS
 
 #define GES_TYPE_OBJECT ges_object_get_type ()
 
-G_DECLARE_DERIVABLE_TYPE (GESObject, ges_object, GES, OBJECT, GObject)
+G_DECLARE_DERIVABLE_TYPE (GESObject, ges_object, GES, OBJECT, GInitiallyUnowned)
 
 struct _GESObjectClass
 {

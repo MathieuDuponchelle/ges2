@@ -42,6 +42,7 @@ _make_nle_object (GESClip *self, GESMediaType media_type)
   GstElement *topbin;
   GstPad *srcpad, *ghost;
   gchar *actual_name, *given_name;
+  GstCaps *caps;
 
   topbin = gst_bin_new (NULL);
   decodebin = gst_element_factory_make ("uridecodebin", NULL);
@@ -57,19 +58,23 @@ _make_nle_object (GESClip *self, GESMediaType media_type)
   if (media_type == GES_MEDIA_TYPE_VIDEO) {
     GstElement *framepositioner = gst_element_factory_make ("framepositioner", "framepositioner");
 
+    caps = gst_caps_from_string(GES_RAW_VIDEO_CAPS);
+
     converter = gst_element_factory_make ("videoconvert", NULL);
     rate = gst_element_factory_make ("videorate", NULL);
     gst_bin_add_many (GST_BIN(topbin), decodebin, converter, rate, framepositioner, NULL);
     gst_element_link_many (converter, rate, framepositioner, NULL);
-    g_object_set (self->priv->nleobject, "caps", gst_caps_from_string(GES_RAW_VIDEO_CAPS), NULL);
+    g_object_set (self->priv->nleobject, "caps", caps, NULL);
     srcpad = gst_element_get_static_pad (framepositioner, "src");
     gst_child_proxy_child_added (GST_CHILD_PROXY (self), G_OBJECT (framepositioner), "framepositioner");
   } else {
+    caps = gst_caps_from_string(GES_RAW_AUDIO_CAPS);
     converter = gst_element_factory_make ("audioconvert", NULL);
     rate = gst_element_factory_make ("audioresample", NULL);
     gst_bin_add_many (GST_BIN(topbin), decodebin, converter, rate, NULL); 
     gst_element_link (converter, rate);
-    g_object_set (self->priv->nleobject, "caps", gst_caps_from_string(GES_RAW_AUDIO_CAPS), NULL);
+    g_object_set (self->priv->nleobject, "caps", caps, NULL);
+    gst_caps_unref (caps);
     srcpad = gst_element_get_static_pad (rate, "src");
   }
 
@@ -85,12 +90,10 @@ _make_nle_object (GESClip *self, GESMediaType media_type)
 
   gst_object_unref (srcpad);
 
-  if (media_type == GES_MEDIA_TYPE_VIDEO)
-    g_object_set (decodebin, "caps", gst_caps_from_string (GES_RAW_VIDEO_CAPS),
-        "expose-all-streams", FALSE, "uri", self->priv->uri, NULL);
-  else
-    g_object_set (decodebin, "caps", gst_caps_from_string (GES_RAW_AUDIO_CAPS),
-        "expose-all-streams", FALSE, "uri", self->priv->uri, NULL);
+  g_object_set (decodebin, "caps", caps,
+      "expose-all-streams", FALSE, "uri", self->priv->uri, NULL);
+
+  gst_caps_unref (caps);
 
   if (!gst_bin_add (GST_BIN (self->priv->nleobject), topbin))
     return;
@@ -283,6 +286,21 @@ _get_property (GObject * object, guint property_id,
 }
 
 static void
+_dispose (GObject *object)
+{
+  GESClip *self = GES_CLIP (object);
+
+  if (self->priv->uri)
+    g_free (self->priv->uri);
+
+  if (self->priv->static_sinkpad)
+    gst_object_unref (self->priv->static_sinkpad);
+
+  gst_object_unref (self->priv->playable_bin);
+  G_OBJECT_CLASS (ges_clip_parent_class)->dispose (object);
+}
+
+static void
 ges_clip_class_init (GESClipClass *klass)
 {
   GObjectClass *g_object_class = G_OBJECT_CLASS (klass);
@@ -292,6 +310,7 @@ ges_clip_class_init (GESClipClass *klass)
 
   g_object_class->set_property = _set_property;
   g_object_class->get_property = _get_property;
+  g_object_class->dispose = _dispose;
 
   g_object_class_install_property (g_object_class, PROP_URI,
       g_param_spec_string ("uri", "URI", "uri of the resource", NULL,

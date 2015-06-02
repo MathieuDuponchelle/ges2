@@ -13,11 +13,12 @@ typedef struct _GESObjectPrivate
   GstClockTime start;
   guint track_index;
   GList *children;
+  GList *control_sources;
 } GESObjectPrivate;
 
 static void ges_object_child_proxy_init (GstChildProxyInterface * iface);
 
-G_DEFINE_TYPE_WITH_CODE (GESObject, ges_object, G_TYPE_OBJECT,
+G_DEFINE_TYPE_WITH_CODE (GESObject, ges_object, G_TYPE_INITIALLY_UNOWNED,
     G_ADD_PRIVATE (GESObject)
     G_IMPLEMENT_INTERFACE (GST_TYPE_CHILD_PROXY, ges_object_child_proxy_init))
 
@@ -211,6 +212,7 @@ ges_object_get_interpolation_control_source (GESObject * self,
   GstControlBinding *binding;
   GObject *object = _lookup_element_for_property (self, property_name, &pspec);
   gchar *base_property_name = _get_base_property_name (property_name);
+  GESObjectPrivate *priv = GES_OBJECT_PRIV (self);
 
   if (!object)
     goto beach;
@@ -221,6 +223,7 @@ ges_object_get_interpolation_control_source (GESObject * self,
   }
 
   if ((binding = gst_object_get_control_binding (GST_OBJECT (object), base_property_name))) {
+    g_object_unref (object);
     g_object_get (binding, "control-source", &source, NULL);
     g_object_unref (binding);
     goto beach;
@@ -228,6 +231,7 @@ ges_object_get_interpolation_control_source (GESObject * self,
 
   if (binding_type != G_TYPE_NONE && binding_type != GST_TYPE_DIRECT_CONTROL_BINDING) {
     GST_ERROR_OBJECT (self, "We only support direct control bindings for now");
+    g_object_unref (object);
     goto beach;
   }
 
@@ -236,11 +240,14 @@ ges_object_get_interpolation_control_source (GESObject * self,
 
   if (!binding) {
     g_object_unref (source);
+    g_object_unref (object);
     source = NULL;
     goto beach;
   }
 
   gst_object_add_control_binding (GST_OBJECT (object), binding);
+  priv->control_sources = g_list_append (priv->control_sources, source);
+  g_object_unref (object);
 
 beach:
   g_free (base_property_name);
@@ -363,12 +370,22 @@ _get_property (GObject * object, guint property_id,
 }
 
 static void
+_dispose (GObject *object)
+{
+  GESObjectPrivate *priv = GES_OBJECT_PRIV (object);
+
+  g_list_free (priv->children);
+  g_list_free_full (priv->control_sources, g_object_unref);
+}
+
+static void
 ges_object_class_init (GESObjectClass *klass)
 {
   GObjectClass *g_object_class = G_OBJECT_CLASS (klass);
 
   g_object_class->set_property = _set_property;
   g_object_class->get_property = _get_property;
+  g_object_class->dispose = _dispose;
 
   g_object_class_install_property (g_object_class, PROP_MEDIA_TYPE,
       g_param_spec_flags ("media-type", "Media Type", "The GESMediaType of the object", GES_TYPE_MEDIA_TYPE,
@@ -403,4 +420,5 @@ ges_object_init (GESObject *self)
   GESObjectPrivate *priv = GES_OBJECT_PRIV (self);
 
   priv->children = NULL;
+  priv->control_sources = NULL;
 }
