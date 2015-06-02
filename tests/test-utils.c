@@ -27,6 +27,7 @@ play_playable (GESPlayable *playable)
   gst_player_play (player);
 
   g_main_loop_run (loop);
+  g_main_loop_unref (loop);
 
   g_object_unref (player);
 }

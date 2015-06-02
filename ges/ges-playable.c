@@ -18,6 +18,7 @@ ges_playable_make_player (GESPlayable * playable)
   uri = g_strdup_printf ("ges:///%p\n", (void *) playable);
   gst_player_set_uri (player, uri);
 
+  g_free (uri);
   return player;
 }
 

@@ -9,19 +9,20 @@ GST_START_TEST (test_tracks)
   GESClip *video_clip2 = ges_clip_new ("file:///home/meh/Videos/homeland.mp4", GES_MEDIA_TYPE_VIDEO);
   GESTimeline *timeline = ges_timeline_new(GES_MEDIA_TYPE_VIDEO);
 
-  ges_object_set_duration (GES_OBJECT (video_clip1), 5 * GST_SECOND);
-  ges_object_set_duration (GES_OBJECT (video_clip2), 5 * GST_SECOND);
+  ges_object_set_duration (GES_OBJECT (video_clip1), 1 * GST_SECOND);
+  ges_object_set_duration (GES_OBJECT (video_clip2), 1 * GST_SECOND);
 
   ges_object_set_inpoint (GES_OBJECT (video_clip1), 60 * GST_SECOND);
   ges_object_set_inpoint (GES_OBJECT (video_clip2), 150 * GST_SECOND);
 
   ges_object_set_start (GES_OBJECT (video_clip1), 0 * GST_SECOND);
-  ges_object_set_start (GES_OBJECT (video_clip2), 2 * GST_SECOND);
+  ges_object_set_start (GES_OBJECT (video_clip2), 0.5 * GST_SECOND);
 
   ges_timeline_add_object (timeline, GES_OBJECT (video_clip1));
   ges_timeline_add_object (timeline, GES_OBJECT (video_clip2));
 
   ges_timeline_commit (timeline);
+  play_playable (GES_PLAYABLE (timeline));
   g_object_unref (timeline);
 }
 
