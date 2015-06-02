@@ -710,7 +710,7 @@ _add_object_func (NleComposition * comp, ChildIOData * childio)
   }
 
 
-  g_hash_table_add (priv->pending_io, object);
+  g_hash_table_add (priv->pending_io, gst_object_ref (object));
 }
 
 static void
@@ -728,7 +728,7 @@ _add_add_object_action (NleComposition * comp, NleObject * object)
 }
 
 static void
-_free_action (Action * action, gpointer udata)
+_free_action (gpointer udata, Action *action)
 {
   if (ACTION_CALLBACK (action) == _seek_pipeline_func) {
     SeekData *seekd = (SeekData *) udata;
@@ -737,6 +737,8 @@ _free_action (Action * action, gpointer udata)
     g_slice_free (SeekData, seekd);
   } else if (ACTION_CALLBACK (action) == _remove_object_func ||
       ACTION_CALLBACK (action) == _add_object_func) {
+    if (ACTION_CALLBACK (action) == _add_object_func)
+      g_object_unref (((ChildIOData *) udata)->object);
     g_slice_free (ChildIOData, udata);
   } else if (ACTION_CALLBACK (action) == _update_pipeline_func ||
       ACTION_CALLBACK (action) == _commit_func ||
@@ -1012,6 +1014,8 @@ nle_composition_dispose (GObject * object)
   }
 
   nle_composition_reset_target_pad (comp);
+  g_hash_table_unref (priv->pending_io);
+  g_list_free_full (priv->actions, (GDestroyNotify) g_closure_unref);
 
   G_OBJECT_CLASS (parent_class)->dispose (object);
 }
