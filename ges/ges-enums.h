@@ -14,6 +14,9 @@ typedef enum {
   GES_MEDIA_TYPE_VIDEO   = 1 << 2,
 } GESMediaType;
 
+#define GES_RAW_AUDIO_CAPS "audio/x-raw"
+#define GES_RAW_VIDEO_CAPS "video/x-raw"
+
 G_END_DECLS
 
 #endif

@@ -26,9 +26,6 @@
 
 #include <gst/gst.h>
 
-#include "ges-clip.h"
-#include "ges-timeline.h"
-
 G_BEGIN_DECLS
 
 #define GST_GES_SOURCE_TYPE (gst_ges_source_get_type ())

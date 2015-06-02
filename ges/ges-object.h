@@ -3,7 +3,7 @@
 
 #include <glib-object.h>
 #include <gst/gst.h>
-#include <ges.h>
+#include <ges-enums.h>
 
 G_BEGIN_DECLS
 

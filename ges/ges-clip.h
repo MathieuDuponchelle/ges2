@@ -1,9 +1,8 @@
 #ifndef _GES_CLIP
 #define _GES_CLIP
 
-#include <ges-object.h>
 #include <gst/gst.h>
-#include <ges.h>
+#include <ges-object.h>
 
 G_BEGIN_DECLS
 

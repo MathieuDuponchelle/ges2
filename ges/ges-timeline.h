@@ -2,8 +2,6 @@
 #define _GES_TIMELINE
 
 #include <gst/gst.h>
-
-#include <ges.h>
 #include <ges-object.h>
 
 G_BEGIN_DECLS

@@ -36,9 +36,9 @@
 #endif
 
 #include <gst/gst.h>
-
-#include "ges-playable.h"
+#include <ges.h>
 #include "gstgessource.h"
+
 
 GST_DEBUG_CATEGORY_STATIC (gstgessource);
 #define GST_CAT_DEFAULT gstgessource
