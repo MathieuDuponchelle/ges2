@@ -1,9 +1,10 @@
 #include "ges-timeline.h"
 #include "ges-composition-bin.h"
-#include "ges-clip.h"
 #include "ges-playable.h"
 #include "nle.h"
+#include "ges-transition.h"
 #include "gst/controller/controller.h"
+#include "ges-clip.h"
 
 /* Structure definitions */
 
@@ -28,9 +29,24 @@ typedef struct
 {
   GSequence *objects_by_start;
   GESObject *prev;
+  GESTimeline *timeline;
 } GESTrack;
 
+enum
+{
+  PROP_0,
+  PROP_MEDIA_TYPE,
+};
+
+enum
+{
+  TRANSITION_ADDED,
+  TRANSITION_REMOVED,
+  LAST_SIGNAL
+};
+
 static void ges_playable_interface_init (GESPlayableInterface * iface);
+static guint ges_timeline_signals[LAST_SIGNAL] = { 0 };
 
 G_DEFINE_TYPE_WITH_CODE (GESTimeline, ges_timeline, GES_TYPE_OBJECT,
     G_IMPLEMENT_INTERFACE (GES_TYPE_PLAYABLE, ges_playable_interface_init))
@@ -128,6 +144,7 @@ _add_track (GESTimeline *self, GESMediaType media_type)
   GList *tracks = g_hash_table_lookup (self->priv->tracks, GINT_TO_POINTER (media_type));
 
   track->objects_by_start = g_sequence_new (NULL);
+  track->timeline = self;
   tracks = g_list_append (tracks, track);
   g_hash_table_replace (self->priv->tracks, GINT_TO_POINTER (media_type), tracks);
 }
@@ -159,7 +176,7 @@ _make_nle_objects (GESTimeline *self, GESMediaType media_type)
 
   if (media_type & GES_MEDIA_TYPE_VIDEO) {
     GstElement *background = gst_parse_bin_from_description (
-        "videotestsrc ! framepositioner name=background_video_positioner", TRUE, NULL);
+        "videotestsrc ! framepositioner name=background_video_positioner zorder=1000", TRUE, NULL);
     GstElement *pos = gst_bin_get_by_name (GST_BIN (background), "background_video_positioner");
     g_object_set (pos, "alpha", 0.0, NULL);
     gst_object_unref (pos);
@@ -187,22 +204,37 @@ _compare_starts (GESObject *object1, GESObject *object2, gpointer unused)
 }
 
 static void
-_create_transition (GESObject *prev, GESObject *next)
+_create_or_update_transition (GESTimeline *self, GESObject *prev, GESObject *next)
 {
-  GstTimedValueControlSource *source;
-  GstClockTime transition_start, transition_stop;
+  GESTransition *transition = ges_clip_get_transition (GES_CLIP (prev));
 
-  source = GST_TIMED_VALUE_CONTROL_SOURCE (
-      ges_object_get_interpolation_control_source (prev, "framepositioner::alpha", G_TYPE_NONE));
+  if (!transition) {
+    transition = ges_transition_new (prev, next);
 
-  g_object_set (source, "mode", GST_INTERPOLATION_MODE_LINEAR, NULL);
-  transition_start = ges_object_get_inpoint (prev) + ges_object_get_start (next) - ges_object_get_start (prev);
-  transition_stop = ges_object_get_inpoint (prev) + ges_object_get_duration (prev);
+    ges_clip_set_transition (GES_CLIP (prev), transition);
+    g_signal_emit (self, ges_timeline_signals[TRANSITION_ADDED], 0,
+        transition);
+  } else {
+    GESObject *faded_in_clip;
 
-  GST_DEBUG ("adding transition from %" GST_TIME_FORMAT " to %" GST_TIME_FORMAT, GST_TIME_ARGS (transition_start), GST_TIME_ARGS (transition_stop));
+    g_object_get (transition, "faded-in-clip", &faded_in_clip, NULL);
 
-  gst_timed_value_control_source_set (source, transition_start, 1.0);
-  gst_timed_value_control_source_set (source, transition_stop, 0.0);
+    if (faded_in_clip != next)  {
+      g_object_ref (transition);
+      ges_clip_set_transition (GES_CLIP (prev), NULL);
+      g_signal_emit (self, ges_timeline_signals[TRANSITION_REMOVED], 0,
+          transition);
+      g_object_unref (transition);
+      transition = ges_transition_new (prev, next);
+
+      ges_clip_set_transition (GES_CLIP (prev), transition);
+      g_signal_emit (self, ges_timeline_signals[TRANSITION_ADDED], 0,
+          transition);
+    } else  {
+      ges_transition_update (transition);
+    }
+    g_object_unref (faded_in_clip);
+  }
 }
 
 static void
@@ -215,13 +247,21 @@ _check_transition (GESObject *object, GESTrack *track)
 
   /* We don't overlap */
   if (ges_object_get_start (track->prev) + ges_object_get_duration (track->prev) <= ges_object_get_start (object)) {
+    GESTransition *transition = ges_clip_get_transition (GES_CLIP (track->prev));
+
+    if (transition) {
+      g_object_ref (transition);
+      ges_clip_set_transition (GES_CLIP (track->prev), NULL);
+      g_signal_emit (track->timeline, ges_timeline_signals[TRANSITION_REMOVED], 0,
+          transition);
+      g_object_unref (transition);
+    }
     track->prev = object;
     return;
   }
 
-  _create_transition (track->prev, object);
+  _create_or_update_transition (track->timeline, track->prev, object);
   track->prev = object;
-  GST_ERROR ("OK these two objects overlap !");
 }
 
 static void
@@ -251,6 +291,7 @@ static void
 _update_transitions (GESTimeline *self)
 {
   _update_transitions_for_media_type (self, GES_MEDIA_TYPE_VIDEO);
+  _update_transitions_for_media_type (self, GES_MEDIA_TYPE_AUDIO);
 }
 
 static void
@@ -469,12 +510,6 @@ GList *ges_timeline_get_compositions_by_media_type (GESTimeline *self, GESMediaT
 
 /* GObject initialization */
 
-enum
-{
-  PROP_0,
-  PROP_MEDIA_TYPE,
-};
-
 static void
 _set_property (GObject * object, guint property_id,
     const GValue * value, GParamSpec * pspec)
@@ -506,6 +541,7 @@ _dispose (GObject *object)
 {
   GESTimeline *self = GES_TIMELINE (object);
 
+  GST_ERROR ("timeline disposed");
   g_sequence_free (self->priv->object_by_start);
   g_hash_table_foreach (self->priv->tracks, (GHFunc) _free_tracks, NULL);
   g_hash_table_unref (self->priv->tracks);
@@ -528,6 +564,16 @@ ges_timeline_class_init (GESTimelineClass *klass)
   g_object_class->get_property = _get_property;
   g_object_class->dispose = _dispose;
 
+  ges_timeline_signals[TRANSITION_ADDED] =
+      g_signal_new ("transition-added", G_TYPE_FROM_CLASS (klass),
+      G_SIGNAL_RUN_FIRST, 0, NULL, NULL, g_cclosure_marshal_generic,
+      G_TYPE_NONE, 1, GES_TYPE_TRANSITION);
+
+  ges_timeline_signals[TRANSITION_REMOVED] =
+      g_signal_new ("transition-removed", G_TYPE_FROM_CLASS (klass),
+      G_SIGNAL_RUN_FIRST, 0, NULL, NULL, g_cclosure_marshal_generic,
+      G_TYPE_NONE, 1, GES_TYPE_TRANSITION);
+
   ges_object_class->set_inpoint = _set_inpoint;
   ges_object_class->set_duration = _set_duration;
   ges_object_class->set_start = _set_start;
@@ -544,7 +590,7 @@ ges_timeline_init (GESTimeline *self)
 
   self->priv->compositions = NULL;
   self->priv->nleobjects = NULL;
-  self->priv->composition_bin = ges_composition_bin_new ();
+  self->priv->composition_bin = gst_object_ref_sink (ges_composition_bin_new ());
   self->priv->object_by_start = g_sequence_new (g_object_unref);
   self->priv->tracks = g_hash_table_new (g_direct_hash, g_direct_equal);
 }

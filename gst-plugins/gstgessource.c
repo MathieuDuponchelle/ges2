@@ -199,7 +199,6 @@ _dispose (GObject *object)
   GstBin *sbin = GST_BIN (self);
 
   if (self->playable) {
-    gst_object_ref (self->playable_bin);
     gst_bin_remove (sbin, GST_ELEMENT (self->playable_bin));
     ges_playable_make_playable (self->playable, FALSE);
   }

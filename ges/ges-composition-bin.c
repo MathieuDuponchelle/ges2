@@ -239,6 +239,7 @@ _dispose (GObject *object)
   GESCompositionBin *self = GES_COMPOSITION_BIN (object);
   GList *tmp;
 
+  GST_ERROR ("composition bin disposed");
   for (tmp = self->priv->ghostpads; tmp; tmp = tmp->next) {
     gst_ghost_pad_set_target (GST_GHOST_PAD (tmp->data), NULL);
   }

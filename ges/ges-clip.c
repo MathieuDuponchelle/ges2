@@ -13,6 +13,7 @@ typedef struct _GESClipPrivate
   GstPad *static_sinkpad;
   guint track_index;
   GstElement *playable_bin;
+  GESTransition *transition;
 } GESClipPrivate;
 
 struct _GESClip
@@ -74,7 +75,6 @@ _make_nle_object (GESClip *self, GESMediaType media_type)
     gst_bin_add_many (GST_BIN(topbin), decodebin, converter, rate, NULL); 
     gst_element_link (converter, rate);
     g_object_set (self->priv->nleobject, "caps", caps, NULL);
-    gst_caps_unref (caps);
     srcpad = gst_element_get_static_pad (rate, "src");
   }
 
@@ -173,6 +173,25 @@ GESClip *
 ges_clip_new (const gchar *uri, GESMediaType media_type)
 {
   return g_object_new (GES_TYPE_CLIP, "uri", uri, "media-type", media_type, NULL);
+}
+
+gboolean
+ges_clip_set_transition (GESClip *self, GESTransition *transition)
+{
+  if (self->priv->transition) {
+    ges_transition_reset (self->priv->transition);
+    g_object_unref (self->priv->transition);
+  }
+
+  self->priv->transition = transition;
+
+  return TRUE;
+}
+
+GESTransition *
+ges_clip_get_transition (GESClip *self)
+{
+  return self->priv->transition;
 }
 
 /* GESObject implementation */
@@ -332,7 +351,8 @@ ges_clip_init (GESClip *self)
       GES_TYPE_CLIP, GESClipPrivate);
 
   self->priv->old_parent = NULL;
-  self->priv->playable_bin = gst_bin_new (NULL);
+  self->priv->playable_bin = gst_object_ref_sink (gst_bin_new (NULL));
+  self->priv->transition = NULL;
   padname = g_strdup_printf ("clip_%p_src", self->priv->nleobject);
   self->priv->ghostpad = gst_ghost_pad_new_no_target (padname, GST_PAD_SRC);
   g_free (padname);
