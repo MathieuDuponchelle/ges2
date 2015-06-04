@@ -168,9 +168,14 @@ _make_nle_objects (GESTimeline *self, GESMediaType media_type)
   GstElement *composition;
 
   if (media_type & GES_MEDIA_TYPE_AUDIO) {
+    GstElement *background = gst_parse_bin_from_description (
+        "audiotestsrc ! samplecontroller name=background_audio_controller", TRUE, NULL);
+    GstElement *samplecontroller = gst_bin_get_by_name (GST_BIN (background), "background_audio_controller");
+    g_object_set (samplecontroller, "volume", 0.0, NULL);
+    gst_object_unref (samplecontroller);
     composition = _create_composition (self, GES_RAW_AUDIO_CAPS, "audio-composition");
-    _add_expandable_operation (composition, "audiomixer", 0, "timeline-audiomixer");
-    _add_expandable_source (composition, gst_element_factory_make ("videotestsrc", NULL), 1, "timeline-audio-background");
+    _add_expandable_operation (composition, "smartaudiomixer", 0, "timeline-audiomixer");
+    _add_expandable_source (composition, background, 1, "timeline-audio-background");
     _add_track (self, GES_MEDIA_TYPE_AUDIO);
   }
 

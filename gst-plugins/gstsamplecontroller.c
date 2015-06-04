@@ -227,5 +227,7 @@ gst_sample_controller_transform_ip (GstBaseTransform * trans, GstBuffer * buf)
   meta->zorder = samplecontroller->zorder;
   GST_OBJECT_UNLOCK (samplecontroller);
 
+  GST_DEBUG_OBJECT (samplecontroller, "controlled volume @ %" GST_TIME_FORMAT " : %lf",
+      GST_TIME_ARGS (timestamp), samplecontroller->volume);
   return GST_FLOW_OK;
 }

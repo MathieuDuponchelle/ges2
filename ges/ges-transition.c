@@ -1,12 +1,14 @@
 #include <gst/controller/controller.h>
 
 #include "ges-transition.h"
+#include "ges-clip.h"
 
 typedef struct _GESTransitionPrivate
 {
   GESObject *fadeout_clip;
   GESObject *fadein_clip;
-  GstControlSource *control_source;
+  GstControlSource *fadeout_control_source;
+  GstControlSource *fadein_control_source;
 } GESTransitionPrivate;
 
 struct _GESTransition
@@ -31,44 +33,71 @@ void
 ges_transition_update (GESTransition *self)
 {
   GstTimedValueControlSource *source;
-  GstClockTime transition_start, transition_stop;
+  GstClockTime transition_start, transition_stop, duration;
 
   if (!self->priv->fadeout_clip || !self->priv->fadein_clip)
     return;
 
-  source = GST_TIMED_VALUE_CONTROL_SOURCE (self->priv->control_source);
+  source = GST_TIMED_VALUE_CONTROL_SOURCE (self->priv->fadeout_control_source);
 
   transition_start = ges_object_get_inpoint (self->priv->fadeout_clip) +
       ges_object_get_start (self->priv->fadein_clip) -
       ges_object_get_start (self->priv->fadeout_clip);
   transition_stop = ges_object_get_inpoint (self->priv->fadeout_clip) +
     ges_object_get_duration (self->priv->fadeout_clip);
-
-  GST_DEBUG ("transition from %" GST_TIME_FORMAT " to %" GST_TIME_FORMAT, GST_TIME_ARGS (transition_start), GST_TIME_ARGS (transition_stop));
+  duration = transition_stop - transition_start;
 
   gst_timed_value_control_source_set (source, ges_object_get_inpoint (self->priv->fadeout_clip), 1.0);
   gst_timed_value_control_source_set (source, transition_start, 1.0);
   gst_timed_value_control_source_set (source, transition_stop, 0.0);
+
+  source = GST_TIMED_VALUE_CONTROL_SOURCE (self->priv->fadein_control_source);
+
+  transition_start = ges_object_get_inpoint (self->priv->fadein_clip);
+
+  gst_timed_value_control_source_set (source, transition_start, 0.0);
+  gst_timed_value_control_source_set (source, transition_start + duration, 1.0);
+  gst_timed_value_control_source_set (source, ges_object_get_inpoint (self->priv->fadein_clip) +
+      ges_object_get_duration (self->priv->fadein_clip), 1.0);
 }
 
 static void
-_create_control_source (GESTransition *self)
+_create_control_sources (GESTransition *self)
 {
   GObject *next_pos;
   GParamSpec *pspec;
   guint zorder;
 
-  gst_child_proxy_lookup (GST_CHILD_PROXY (self->priv->fadeout_clip),
-      "framepositioner::alpha", &next_pos, &pspec);
+  if (ges_object_get_media_type (self->priv->fadein_clip) & GES_MEDIA_TYPE_VIDEO)
+    gst_child_proxy_lookup (GST_CHILD_PROXY (self->priv->fadein_clip),
+        "framepositioner::alpha", &next_pos, &pspec);
+  else if (ges_object_get_media_type (self->priv->fadein_clip) & GES_MEDIA_TYPE_AUDIO)
+    gst_child_proxy_lookup (GST_CHILD_PROXY (self->priv->fadein_clip),
+        "samplecontroller::volume", &next_pos, &pspec);
+  else
+    return;
 
   g_object_get (next_pos, "zorder", &zorder, NULL);
   g_object_set (next_pos, "zorder", zorder + 1, NULL);
 
-  self->priv->control_source =
-    ges_object_get_interpolation_control_source (GES_OBJECT (self->priv->fadeout_clip),
-        "framepositioner::alpha", G_TYPE_NONE);
+  if (ges_object_get_media_type (self->priv->fadeout_clip) & GES_MEDIA_TYPE_VIDEO) {
+    self->priv->fadeout_control_source =
+      ges_object_get_interpolation_control_source (GES_OBJECT (self->priv->fadeout_clip),
+          "framepositioner::alpha", G_TYPE_NONE);
+    self->priv->fadein_control_source =
+      ges_object_get_interpolation_control_source (GES_OBJECT (self->priv->fadein_clip),
+          "framepositioner::alpha", G_TYPE_NONE);
+  } else if (ges_object_get_media_type (self->priv->fadeout_clip) & GES_MEDIA_TYPE_AUDIO) {
+    self->priv->fadeout_control_source =
+      ges_object_get_interpolation_control_source (GES_OBJECT (self->priv->fadeout_clip),
+          "samplecontroller::volume", G_TYPE_NONE);
+    self->priv->fadein_control_source =
+      ges_object_get_interpolation_control_source (GES_OBJECT (self->priv->fadein_clip),
+          "samplecontroller::volume", G_TYPE_NONE);
+  }
 
-  g_object_set (self->priv->control_source, "mode", GST_INTERPOLATION_MODE_LINEAR, NULL);
+  g_object_set (self->priv->fadeout_control_source, "mode", GST_INTERPOLATION_MODE_LINEAR, NULL);
+  g_object_set (self->priv->fadein_control_source, "mode", GST_INTERPOLATION_MODE_LINEAR, NULL);
 }
 
 void
@@ -83,19 +112,35 @@ ges_transition_reset (GESTransition *self)
   if (!self->priv->fadeout_clip || !self->priv->fadein_clip)
     return;
 
-  /* FIXME : fadeout clip can be removed: weak ref this */
-  gst_child_proxy_lookup (GST_CHILD_PROXY (self->priv->fadeout_clip),
-      "framepositioner::alpha", &next_pos, &pspec);
+  /* FIXME : fadein clip can be removed: weak ref this */
+  if (ges_object_get_media_type (self->priv->fadein_clip) & GES_MEDIA_TYPE_VIDEO)
+    gst_child_proxy_lookup (GST_CHILD_PROXY (self->priv->fadein_clip),
+        "framepositioner::alpha", &next_pos, &pspec);
+  else if (ges_object_get_media_type (self->priv->fadein_clip) & GES_MEDIA_TYPE_AUDIO)
+    gst_child_proxy_lookup (GST_CHILD_PROXY (self->priv->fadein_clip),
+        "samplecontroller::volume", &next_pos, &pspec);
+  else
+    return;
 
-  source = GST_TIMED_VALUE_CONTROL_SOURCE (self->priv->control_source);
   g_object_get (next_pos, "zorder", &zorder, NULL);
   g_object_set (next_pos, "zorder", zorder - 1, NULL);
+
+  source = GST_TIMED_VALUE_CONTROL_SOURCE (self->priv->fadeout_control_source);
 
   end = ges_object_get_inpoint (GES_OBJECT (self->priv->fadeout_clip)) +
     ges_object_get_duration (GES_OBJECT (self->priv->fadeout_clip));
 
   gst_timed_value_control_source_set (source,
       ges_object_get_inpoint (GES_OBJECT (self->priv->fadeout_clip)), 1.0);
+  gst_timed_value_control_source_set (source, end, 1.0);
+
+  source = GST_TIMED_VALUE_CONTROL_SOURCE (self->priv->fadein_control_source);
+
+  end = ges_object_get_inpoint (GES_OBJECT (self->priv->fadein_clip)) +
+    ges_object_get_duration (GES_OBJECT (self->priv->fadein_clip));
+
+  gst_timed_value_control_source_set (source,
+      ges_object_get_inpoint (GES_OBJECT (self->priv->fadein_clip)), 1.0);
   gst_timed_value_control_source_set (source, end, 1.0);
 
   self->priv->fadein_clip = NULL;
@@ -143,7 +188,7 @@ static void
 _constructed (GObject *object)
 {
   GESTransition *self = GES_TRANSITION (object);
-  _create_control_source (self);
+  _create_control_sources (self);
   ges_transition_update (self);
 
   G_OBJECT_CLASS (ges_transition_parent_class)->constructed (object);
@@ -184,7 +229,8 @@ ges_transition_init (GESTransition *self)
 
   self->priv->fadein_clip = NULL;
   self->priv->fadeout_clip = NULL;
-  self->priv->control_source = NULL;
+  self->priv->fadeout_control_source = NULL;
+  self->priv->fadein_control_source = NULL;
 }
 
 GESTransition *

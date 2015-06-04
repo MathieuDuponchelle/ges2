@@ -60,7 +60,6 @@ _make_nle_object (GESClip *self, GESMediaType media_type)
     GstElement *framepositioner = gst_element_factory_make ("framepositioner", "framepositioner");
 
     caps = gst_caps_from_string(GES_RAW_VIDEO_CAPS);
-
     converter = gst_element_factory_make ("videoconvert", NULL);
     rate = gst_element_factory_make ("videorate", NULL);
     gst_bin_add_many (GST_BIN(topbin), decodebin, converter, rate, framepositioner, NULL);
@@ -69,13 +68,16 @@ _make_nle_object (GESClip *self, GESMediaType media_type)
     srcpad = gst_element_get_static_pad (framepositioner, "src");
     gst_child_proxy_child_added (GST_CHILD_PROXY (self), G_OBJECT (framepositioner), "framepositioner");
   } else {
+    GstElement *samplecontroller = gst_element_factory_make ("samplecontroller", "samplecontroller");
+
     caps = gst_caps_from_string(GES_RAW_AUDIO_CAPS);
     converter = gst_element_factory_make ("audioconvert", NULL);
     rate = gst_element_factory_make ("audioresample", NULL);
-    gst_bin_add_many (GST_BIN(topbin), decodebin, converter, rate, NULL); 
-    gst_element_link (converter, rate);
+    gst_bin_add_many (GST_BIN(topbin), decodebin, converter, rate, samplecontroller, NULL);
+    gst_element_link_many (converter, rate, samplecontroller, NULL);
     g_object_set (self->priv->nleobject, "caps", caps, NULL);
-    srcpad = gst_element_get_static_pad (rate, "src");
+    srcpad = gst_element_get_static_pad (samplecontroller, "src");
+    gst_child_proxy_child_added (GST_CHILD_PROXY (self), G_OBJECT (samplecontroller), "samplecontroller");
   }
 
   self->priv->static_sinkpad = gst_element_get_static_pad (converter, "sink");

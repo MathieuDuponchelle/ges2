@@ -28,7 +28,9 @@
 #include <gst/gst.h>
 #include "gstgessource.h"
 #include "gstframepositioner.h"
+#include "gstsamplecontroller.h"
 #include "ges-smart-video-mixer.h"
+#include "ges-smart-audio-mixer.h"
 
 static gboolean
 plugin_init (GstPlugin * plugin)
@@ -37,8 +39,12 @@ plugin_init (GstPlugin * plugin)
       GST_GES_SOURCE_TYPE);
   gst_element_register (plugin, "framepositioner", GST_RANK_NONE,
       GST_TYPE_FRAME_POSITIONNER);
+  gst_element_register (plugin, "samplecontroller", GST_RANK_NONE,
+      GST_TYPE_SAMPLE_CONTROLLER);
   gst_element_register (plugin, "smartvideomixer", GST_RANK_NONE,
       GES_TYPE_SMART_MIXER);
+  gst_element_register (plugin, "smartaudiomixer", GST_RANK_NONE,
+      GES_TYPE_SMART_AUDIO_MIXER);
 
   return TRUE;
 }
