@@ -1,14 +1,5 @@
 gst_check_dep = dependency ('gstreamer-check-1.0')
 
-executable('test-ges',
-'ges.c',
-install: true,
-dependencies : [glib_dep, gst_dep, gobject_dep, gst_player_dep],
-include_directories: inc,
-link_with: [nle, ges],
-c_args: ['-Wno-pedantic']
-)
-
 executable('test_live_src',
 'test_live_src.c',
 install: true,

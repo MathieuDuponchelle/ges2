@@ -14,9 +14,9 @@ G_DECLARE_DERIVABLE_TYPE(GESClip, ges_clip, GES, CLIP, GESObject)
 struct _GESClipClass
 {
   GESObjectClass parent;
+  GstElement *(*make_element) (GESClip *clip);
 };
 
-GESClip *ges_clip_new (const gchar *uri, GESMediaType media_type);
 gboolean ges_clip_set_transition (GESClip *clip, GESTransition *transition);
 GESTransition *ges_clip_get_transition (GESClip *clip);
 

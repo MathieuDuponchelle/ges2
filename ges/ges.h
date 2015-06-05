@@ -6,6 +6,7 @@
 #include <ges-playable.h>
 #include <ges-timeline.h>
 #include <ges-clip.h>
+#include <ges-uri-clip.h>
 
 G_BEGIN_DECLS
 

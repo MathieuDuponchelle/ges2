@@ -8,7 +8,6 @@
 
 typedef struct _GESClipPrivate
 {
-  gchar *uri;
   GstElement *nleobject;
   GstObject *old_parent;
   GstPad *ghostpad;
@@ -36,25 +35,30 @@ _pad_added_cb (GstElement *element, GstPad *srcpad, GESClip *self)
 }
 
 static void
-_make_nle_object (GESClip *self, GESMediaType media_type)
+_make_nle_object (GESClip *self)
 {
   GESClipPrivate *priv = GES_CLIP_PRIV (self);
-  GstElement *decodebin, *rate, *converter;
+  GstElement *element, *rate, *converter;
   GstElement *topbin;
   GstPad *srcpad, *ghost;
-  gchar *actual_name, *given_name;
   GstCaps *caps;
+  GESMediaType media_type;
+  GESClipClass *klass = GES_CLIP_GET_CLASS (self);
+
+  g_object_get (self, "media-type", &media_type, NULL);
+
+  if (!klass->make_element)
+    return;
 
   topbin = gst_bin_new (NULL);
-  decodebin = gst_element_factory_make ("uridecodebin", NULL);
 
-  /* Let's give it a better name */
+  element = klass->make_element (self);
+  if (!element) {
+    GST_ERROR_OBJECT (self, "couldn't make source element");
+    return;
+  }
+
   priv->nleobject = gst_element_factory_make ("nlesource", NULL);
-  given_name = gst_object_get_name (GST_OBJECT (priv->nleobject));
-  actual_name = g_strdup_printf ("%s->%s", given_name, priv->uri);
-  gst_object_set_name (GST_OBJECT (priv->nleobject), actual_name);
-  g_free (actual_name);
-  g_free (given_name);
 
   if (media_type == GES_MEDIA_TYPE_VIDEO) {
     GstElement *framepositioner = gst_element_factory_make ("framepositioner", "framepositioner");
@@ -62,7 +66,7 @@ _make_nle_object (GESClip *self, GESMediaType media_type)
     caps = gst_caps_from_string(GES_RAW_VIDEO_CAPS);
     converter = gst_element_factory_make ("videoconvert", NULL);
     rate = gst_element_factory_make ("videorate", NULL);
-    gst_bin_add_many (GST_BIN(topbin), decodebin, converter, rate, framepositioner, NULL);
+    gst_bin_add_many (GST_BIN(topbin), element, converter, rate, framepositioner, NULL);
     gst_element_link_many (converter, rate, framepositioner, NULL);
     g_object_set (priv->nleobject, "caps", caps, NULL);
     srcpad = gst_element_get_static_pad (framepositioner, "src");
@@ -73,7 +77,7 @@ _make_nle_object (GESClip *self, GESMediaType media_type)
     caps = gst_caps_from_string(GES_RAW_AUDIO_CAPS);
     converter = gst_element_factory_make ("audioconvert", NULL);
     rate = gst_element_factory_make ("audioresample", NULL);
-    gst_bin_add_many (GST_BIN(topbin), decodebin, converter, rate, samplecontroller, NULL);
+    gst_bin_add_many (GST_BIN(topbin), element, converter, rate, samplecontroller, NULL);
     gst_element_link_many (converter, rate, samplecontroller, NULL);
     g_object_set (priv->nleobject, "caps", caps, NULL);
     srcpad = gst_element_get_static_pad (samplecontroller, "src");
@@ -82,9 +86,6 @@ _make_nle_object (GESClip *self, GESMediaType media_type)
 
   priv->static_sinkpad = gst_element_get_static_pad (converter, "sink");
 
-  g_signal_connect (decodebin, "pad-added",
-      G_CALLBACK (_pad_added_cb),
-      self);
 
   ghost = gst_ghost_pad_new ("src", srcpad);
   gst_pad_set_active (ghost, TRUE);
@@ -92,10 +93,17 @@ _make_nle_object (GESClip *self, GESMediaType media_type)
 
   gst_object_unref (srcpad);
 
-  g_object_set (decodebin, "caps", caps,
-      "expose-all-streams", FALSE, "uri", priv->uri, NULL);
-
   gst_caps_unref (caps);
+
+  srcpad = gst_element_get_static_pad (element, "src");
+  if (srcpad) {
+    gst_pad_link (srcpad, priv->static_sinkpad);
+    gst_object_unref (srcpad);
+  } else {
+    g_signal_connect (element, "pad-added",
+        G_CALLBACK (_pad_added_cb),
+        self);
+  }
 
   if (!gst_bin_add (GST_BIN (priv->nleobject), topbin))
     return;
@@ -165,24 +173,6 @@ ges_playable_interface_init (GESPlayableInterface * iface)
 
 /* API */
 
-void
-ges_clip_set_uri (GESClip *self, const gchar *uri)
-{
-  GESClipPrivate *priv = GES_CLIP_PRIV (self);
-
-  if (priv->nleobject) {
-    GST_ERROR_OBJECT (self, "changing uri is not supported yet");
-  }
-
-  priv->uri = g_strdup (uri);
-}
-
-GESClip *
-ges_clip_new (const gchar *uri, GESMediaType media_type)
-{
-  return g_object_new (GES_TYPE_CLIP, "uri", uri, "media-type", media_type, NULL);
-}
-
 gboolean
 ges_clip_set_transition (GESClip *self, GESTransition *transition)
 {
@@ -240,16 +230,11 @@ _set_start (GESObject *object, GstClockTime start)
 static gboolean
 _set_media_type (GESObject *object, GESMediaType media_type)
 {
-  GESClip *self = GES_CLIP (object);
   GESClipPrivate *priv = GES_CLIP_PRIV (object);
 
   if (priv->nleobject) {
     GST_ERROR_OBJECT (object, "changing media type isn't supported yet");
     return FALSE;
-  }
-
-  if (priv->uri) {
-    _make_nle_object (self, media_type);
   }
 
   return TRUE;
@@ -289,43 +274,10 @@ enum
 };
 
 static void
-_set_property (GObject * object, guint property_id,
-    const GValue * value, GParamSpec * pspec)
-{
-  GESClip *self = GES_CLIP (object);
-
-  switch (property_id) {
-    case PROP_URI:
-      ges_clip_set_uri (self, g_value_get_string (value));
-      break;
-    default:
-      G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
-  }
-}
-
-static void
-_get_property (GObject * object, guint property_id,
-    GValue * value, GParamSpec * pspec)
-{
-  GESClipPrivate *priv = GES_CLIP_PRIV (object);
-
-  switch (property_id) {
-    case PROP_URI:
-      g_value_set_string (value, priv->uri);
-      break;
-    default:
-      G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
-  }
-}
-
-static void
 _dispose (GObject *object)
 {
   GESClip *self = GES_CLIP (object);
   GESClipPrivate *priv = GES_CLIP_PRIV (self);
-
-  if (priv->uri)
-    g_free (priv->uri);
 
   if (priv->static_sinkpad)
     gst_object_unref (priv->static_sinkpad);
@@ -335,18 +287,20 @@ _dispose (GObject *object)
 }
 
 static void
+_constructed (GObject *object)
+{
+  _make_nle_object (GES_CLIP (object));
+  G_OBJECT_CLASS (ges_clip_parent_class)->constructed (object);
+}
+
+static void
 ges_clip_class_init (GESClipClass *klass)
 {
   GObjectClass *g_object_class = G_OBJECT_CLASS (klass);
   GESObjectClass *ges_object_class = GES_OBJECT_CLASS (klass);
 
-  g_object_class->set_property = _set_property;
-  g_object_class->get_property = _get_property;
   g_object_class->dispose = _dispose;
-
-  g_object_class_install_property (g_object_class, PROP_URI,
-      g_param_spec_string ("uri", "URI", "uri of the resource", NULL,
-          G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+  g_object_class->constructed = _constructed;
 
   ges_object_class->set_start = _set_start;
   ges_object_class->set_duration = _set_duration;

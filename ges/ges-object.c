@@ -389,7 +389,7 @@ ges_object_class_init (GESObjectClass *klass)
 
   g_object_class_install_property (g_object_class, PROP_MEDIA_TYPE,
       g_param_spec_flags ("media-type", "Media Type", "The GESMediaType of the object", GES_TYPE_MEDIA_TYPE,
-          GES_MEDIA_TYPE_UNKNOWN, G_PARAM_READWRITE));
+          GES_MEDIA_TYPE_UNKNOWN, G_PARAM_READWRITE | G_PARAM_CONSTRUCT));
 
   g_object_class_install_property (g_object_class, PROP_INPOINT,
       g_param_spec_uint64 ("inpoint", "Inpoint", "The inpoint of the object", 0, G_MAXUINT64,

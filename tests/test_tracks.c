@@ -18,8 +18,8 @@ _transition_removed_cb (GESTimeline *timeline, GESTransition *transition, guint 
 
 GST_START_TEST (test_tracks)
 {
-  GESClip *video_clip1 = ges_clip_new ("file:///home/meh/Videos/homeland.mp4", GES_MEDIA_TYPE_AUDIO);
-  GESClip *video_clip2 = ges_clip_new ("file:///home/meh/Music/waka.mp4", GES_MEDIA_TYPE_AUDIO);
+  GESClip *video_clip1 = ges_uri_clip_new ("file:///home/meh/Videos/homeland.mp4", GES_MEDIA_TYPE_AUDIO);
+  GESClip *video_clip2 = ges_uri_clip_new ("file:///home/meh/Music/waka.mp4", GES_MEDIA_TYPE_AUDIO);
   GESTimeline *timeline = ges_timeline_new(GES_MEDIA_TYPE_AUDIO);
   guint n_transitions = 0;
 
