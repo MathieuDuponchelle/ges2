@@ -5,10 +5,9 @@
 
 GST_START_TEST (test_clip)
 {
-  GESClip *video_clip1 = ges_uri_clip_new ("file:///home/meh/Videos/homeland.mp4", GES_MEDIA_TYPE_VIDEO);
+  GESClip *video_clip1 = ges_test_clip_new (GES_MEDIA_TYPE_VIDEO, "snow");
 
   ges_object_set_duration (GES_OBJECT (video_clip1), 5 * GST_SECOND);
-  ges_object_set_inpoint (GES_OBJECT (video_clip1), 60 * GST_SECOND);
 
   play_playable (GES_PLAYABLE (video_clip1));
 
