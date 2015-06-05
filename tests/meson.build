@@ -18,6 +18,22 @@ link_with: [nle, ges],
 c_args: ['-Wno-pedantic']
 )
 
+test_clip = executable ('test_clip',
+'test_clip.c', 'test-utils.c',
+install: true,
+dependencies : [glib_dep, gst_dep, gobject_dep, gst_player_dep, gst_check_dep],
+include_directories: inc,
+link_with: [nle, ges],
+c_args: ['-Wno-pedantic'])
+
+test ('test_clip', test_clip, valgrind_args:['--suppressions=../tests/gst.supp',
+						 '--tool=memcheck',
+						 '--leak-check=full',
+						 '--trace-children=yes',
+						 '--show-possibly-lost=no',
+						 '--leak-resolution=high',
+						 '-q',
+						 '--num-callers=20'])
 test_tracks = executable ('test_tracks',
 'test_tracks.c', 'test-utils.c',
 install: true,

@@ -9,7 +9,12 @@ G_BEGIN_DECLS
 
 #define GES_TYPE_CLIP (ges_clip_get_type ())
 
-G_DECLARE_FINAL_TYPE(GESClip, ges_clip, GES, CLIP, GESObject)
+G_DECLARE_DERIVABLE_TYPE(GESClip, ges_clip, GES, CLIP, GESObject)
+
+struct _GESClipClass
+{
+  GESObjectClass parent;
+};
 
 GESClip *ges_clip_new (const gchar *uri, GESMediaType media_type);
 gboolean ges_clip_set_transition (GESClip *clip, GESTransition *transition);
