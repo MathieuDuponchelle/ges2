@@ -116,6 +116,8 @@ struct _NleObject
   /* active in parent */
   gboolean active;
 
+  gboolean is_live;
+
   /* Filtering caps */
   GstCaps *caps;
 

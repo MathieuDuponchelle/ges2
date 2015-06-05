@@ -2294,6 +2294,7 @@ static GstStateChangeReturn
 nle_composition_change_state (GstElement * element, GstStateChange transition)
 {
   NleComposition *comp = (NleComposition *) element;
+  NleObject *nleobject = NLE_OBJECT (element);
 
   GST_DEBUG_OBJECT (comp, "%s => %s",
       gst_element_state_get_name (GST_STATE_TRANSITION_CURRENT (transition)),
@@ -2310,6 +2311,10 @@ nle_composition_change_state (GstElement * element, GstStateChange transition)
 
       _add_update_compo_action (comp, G_CALLBACK (_initialize_stack_func),
           COMP_UPDATE_STACK_INITIALIZE);
+      if (nleobject->is_live) {
+        GST_ELEMENT_CLASS (parent_class)->change_state (element, transition);
+        return GST_STATE_CHANGE_NO_PREROLL;
+      }
       break;
     case GST_STATE_CHANGE_PAUSED_TO_READY:
       _stop_task (comp);

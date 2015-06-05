@@ -78,6 +78,7 @@ enum
   PROP_CAPS,
   PROP_EXPANDABLE,
   PROP_COMPOSITION,
+  PROP_IS_LIVE,
   PROP_LAST
 };
 
@@ -208,6 +209,16 @@ nle_object_class_init (NleObjectClass * klass)
       "Use this object in the NleComposition", TRUE, G_PARAM_READWRITE);
   g_object_class_install_property (gobject_class, PROP_ACTIVE,
       properties[PROP_ACTIVE]);
+
+  /**
+   * NleObject:is-live
+   *
+   * Indicates whether this object is a live object.
+   */
+  properties[PROP_IS_LIVE] = g_param_spec_boolean ("is-live", "Is live",
+      "This object is a live object", FALSE, G_PARAM_READWRITE);
+  g_object_class_install_property (gobject_class, PROP_IS_LIVE,
+      properties[PROP_IS_LIVE]);
 
   /**
    * NleObject:caps
@@ -515,6 +526,9 @@ nle_object_set_property (GObject * object, guint prop_id,
     case PROP_ACTIVE:
       SET_PENDING_VALUE (active, "active", boolean, G_GUINT32_FORMAT);
       break;
+    case PROP_IS_LIVE:
+      nleobject->is_live = g_value_get_boolean (value);
+      break;
     case PROP_CAPS:
       nle_object_set_caps (nleobject, gst_value_get_caps (value));
       break;
@@ -556,6 +570,8 @@ nle_object_get_property (GObject * object, guint prop_id,
     case PROP_ACTIVE:
       g_value_set_boolean (value, nleobject->pending_active);
       break;
+    case PROP_IS_LIVE:
+      g_value_set_boolean (value, nleobject->is_live);
     case PROP_CAPS:
       gst_value_set_caps (value, nleobject->caps);
       break;
