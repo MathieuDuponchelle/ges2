@@ -85,15 +85,31 @@ void
 ges_structure_parser_parse_whitespace (GESStructureParser * self)
 {
   self->add_comma = TRUE;
+  if (self->add_quotes && self->current_string) {
+    gchar *new_string = NULL;
+    new_string = g_strconcat (self->current_string, "\"", NULL);
+    g_free (self->current_string);
+    self->current_string = new_string;
+    self->add_quotes = FALSE;
+  }
 }
 
 static void
 _finish_structure (GESStructureParser * self)
 {
+  if (self->add_quotes && self->current_string) {
+    gchar *new_string = NULL;
+    new_string = g_strconcat (self->current_string, "\"", NULL);
+    g_free (self->current_string);
+    self->current_string = new_string;
+    self->add_quotes = FALSE;
+  }
+
   if (self->current_string) {
     GstStructure *structure =
         gst_structure_new_from_string (self->current_string);
 
+    GST_ERROR ("current string is %s", self->current_string);
     if (structure == NULL) {
       GST_ERROR ("Could not parse %s", self->current_string);
 
@@ -125,8 +141,11 @@ ges_structure_parser_parse_symbol (GESStructureParser * self,
     symbol++;
 
   self->add_comma = FALSE;
-  if (!g_ascii_strncasecmp (symbol, "clip", 4))
-    ges_structure_parser_parse_string (self, "clip, uri=", TRUE);
+  self->add_quotes = FALSE;
+  if (!g_ascii_strncasecmp (symbol, "clip", 4)) {
+    ges_structure_parser_parse_string (self, "clip, uri=\"", TRUE);
+    self->add_quotes = TRUE;
+  }
   else if (!g_ascii_strncasecmp (symbol, "test-clip", 9))
     ges_structure_parser_parse_string (self, "test-clip, pattern=", TRUE);
   else if (!g_ascii_strncasecmp (symbol, "effect", 6))
@@ -174,7 +193,6 @@ ges_structure_parser_get_error (GESStructureParser * self)
     return NULL;
 
   msg = g_string_new ("Could not parse: ");
-
 
   for (tmp = self->wrong_strings; tmp; tmp = tmp->next) {
     g_string_append_printf (msg, " %s", (gchar *) tmp->data);
