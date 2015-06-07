@@ -181,9 +181,9 @@ _make_nle_objects (GESTimeline *self, GESMediaType media_type)
 
   if (media_type & GES_MEDIA_TYPE_VIDEO) {
     GstElement *background = gst_parse_bin_from_description (
-        "videotestsrc ! framepositioner name=background_video_positioner zorder=1000", TRUE, NULL);
+        "videotestsrc ! framepositioner name=background_video_positioner", TRUE, NULL);
     GstElement *pos = gst_bin_get_by_name (GST_BIN (background), "background_video_positioner");
-    g_object_set (pos, "alpha", 0.0, NULL);
+    g_object_set (pos, "alpha", 0.0, "zorder", 10000, NULL);
     gst_object_unref (pos);
     composition = _create_composition (self, GES_RAW_VIDEO_CAPS, "video-composition");
     _add_expandable_operation (composition, "smartvideomixer", 0, "timeline-videomixer");

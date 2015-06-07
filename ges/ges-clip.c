@@ -86,7 +86,6 @@ _make_nle_object (GESClip *self)
 
   priv->static_sinkpad = gst_element_get_static_pad (converter, "sink");
 
-
   ghost = gst_ghost_pad_new ("src", srcpad);
   gst_pad_set_active (ghost, TRUE);
   gst_element_add_pad (topbin, ghost);
