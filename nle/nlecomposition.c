@@ -826,6 +826,20 @@ nle_composition_handle_message (GstBin * bin, GstMessage * message)
 {
   NleComposition *comp = (NleComposition *) bin;
 
+  if (GST_MESSAGE_TYPE (message) == GST_MESSAGE_BUFFERING) {
+    /* When the current bin gets teared down and a new remote
+     * source is setup, it emits buffering messages, even though
+     * the user has hopefully set large values on the queues that follow
+     * the composition, which means we don't need to disrupt playback (yet)
+     * FIXME: we might want to emit BUFFERING messages on our own though,
+     * figure that out :)
+     */
+    GST_DEBUG_OBJECT (comp, "Dropping buffering message %" GST_PTR_FORMAT
+        "it doesn't make sense in our situation", message);
+    gst_message_unref (message);
+    return;
+  }
+
   if (comp->priv->tearing_down_stack) {
     if (GST_MESSAGE_TYPE (message) == GST_MESSAGE_ERROR) {
       GST_FIXME_OBJECT (comp, "Dropping %" GST_PTR_FORMAT " message from "
@@ -2313,6 +2327,7 @@ nle_composition_change_state (GstElement * element, GstStateChange transition)
           COMP_UPDATE_STACK_INITIALIZE);
       if (nleobject->is_live) {
         GST_ELEMENT_CLASS (parent_class)->change_state (element, transition);
+        GST_ERROR ("warning, experimental support of live sources !");
         return GST_STATE_CHANGE_NO_PREROLL;
       }
       break;
