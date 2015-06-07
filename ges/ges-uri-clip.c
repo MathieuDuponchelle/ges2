@@ -1,3 +1,6 @@
+#include <grilo.h>
+#include <gst/pbutils/gstdiscoverer.h>
+
 #include "ges-timeline.h"
 #include "ges-uri-clip.h"
 
@@ -33,10 +36,98 @@ ges_uri_clip_set_uri (GESUriClip *self, const gchar *uri)
   priv->uri = g_strdup (uri);
 }
 
+static GrlMedia *
+grl_media_from_uri (const gchar * uri)
+{
+  GrlMedia *media = NULL;
+  GError *error = NULL;
+  GList *tmp;
+  GrlOperationOptions *options;
+  GrlRegistry *registry = grl_registry_get_default ();
+  GrlSource *source;
+  GrlKeyID disco_key_id =
+    grl_registry_lookup_metadata_key (registry, "discovery");
+  GList *keys = grl_metadata_key_list_new (GRL_METADATA_KEY_EXTERNAL_URL,
+      GRL_METADATA_KEY_URL,
+      disco_key_id,
+      GRL_METADATA_KEY_INVALID);
+
+  if (disco_key_id == GRL_METADATA_KEY_INVALID)
+    return NULL;
+
+  registry = grl_registry_get_default ();
+
+  options = grl_operation_options_new (NULL);
+  grl_operation_options_set_count (options, 1);
+  grl_operation_options_set_resolution_flags (options, GRL_RESOLVE_FULL);
+
+  for (tmp = grl_registry_get_sources_by_operations (registry, GRL_OP_MEDIA_FROM_URI, TRUE); tmp; tmp=tmp->next)  {
+    source = GRL_SOURCE (tmp->data);
+    if (grl_source_test_media_from_uri (source, uri)) {
+      error = NULL;
+      media = grl_source_get_media_from_uri_sync (source,
+          uri, keys, options, &error);
+      if (media) {
+        break;
+      }
+    }
+  }
+
+  return media;
+}
+
+static GstDiscovererInfo *
+_get_discoverer_info_from_grl_media (GrlMedia *media)
+{
+  GrlRegistry *registry = grl_registry_get_default ();
+  const GValue *info_value;
+  GstDiscovererInfo *info;
+
+  GrlKeyID disco_key_id =
+    grl_registry_lookup_metadata_key (registry, "discovery");
+
+  info_value = grl_data_get (GRL_DATA (media), disco_key_id);
+  info = g_value_get_object (info_value);
+
+  return info;
+}
+
 GESClip *
 ges_uri_clip_new (const gchar *uri, GESMediaType media_type)
 {
-  GESClip *res = g_object_new (GES_TYPE_URI_CLIP, "uri", uri, "media-type", media_type, NULL);
+  GrlMedia *media = grl_media_from_uri (uri);
+  GstDiscovererInfo *info;
+  GList *streams;
+
+  if (!media) {
+    GST_WARNING ("We couldn't recognize this uri with grilo : %s, beware", uri);
+    /* We still return a clip, the user might have its own asset management
+     * tools, but he will need to set the duration himself */
+    return g_object_new (GES_TYPE_URI_CLIP, "uri", grl_media_get_url (media), "media-type", media_type, NULL);
+  }
+
+  info = _get_discoverer_info_from_grl_media (media);
+  if (media_type == GES_MEDIA_TYPE_AUDIO) {
+    streams = gst_discoverer_info_get_audio_streams (info);
+    if (!streams) {
+      gst_discoverer_info_unref (info);
+      return NULL;
+    }
+  } else if (media_type == GES_MEDIA_TYPE_VIDEO) {
+    streams = gst_discoverer_info_get_video_streams (info);
+    if (!streams) {
+      gst_discoverer_info_unref (info);
+      return NULL;
+    }
+  } else {
+    return NULL;
+  }
+
+  gst_discoverer_stream_info_list_free (streams);
+
+  GESClip *res = g_object_new (GES_TYPE_URI_CLIP, "uri", grl_media_get_url (media), "media-type", media_type, NULL);
+  GST_DEBUG_OBJECT (res, "Actual media uri : %s", grl_media_get_url (media));
+  g_object_set (res, "duration", gst_discoverer_info_get_duration (info), NULL);
 
   return res;
 }
@@ -62,6 +153,10 @@ _make_element (GESClip *clip)
   decodebin = gst_element_factory_make ("uridecodebin", NULL);
   g_object_set (decodebin, "caps", caps,
       "expose-all-streams", FALSE, "uri", priv->uri, NULL);
+
+  /* In case this is a remote source, we'll want to use download buffering and
+   * have a large queue so nle can perform the switches peacefully */
+  g_object_set (decodebin, "use-buffering", FALSE, "download", TRUE, "buffer-size", 10 * 1024 * 1024, NULL);
   gst_caps_unref (caps);
 
   return decodebin;

@@ -1,3 +1,4 @@
+#include <grilo.h>
 #include "ges.h"
 #include "nle.h"
   
@@ -15,6 +16,34 @@ static struct _elements_entry _elements[] = {
   {NULL, 0}
 };
 
+static void
+configure_plugins (void)
+{
+  GrlConfig *config;
+  GrlRegistry *registry;
+
+  config = grl_config_new ("grl-youtube", NULL);
+  /* FIXME maybe get one for us :) */
+  grl_config_set_api_key (config, "AIzaSyCENhl8yDxDZbyhTF6p-ok-RefK07xdXUg");
+  registry = grl_registry_get_default ();
+  grl_registry_add_config (registry, config, NULL);
+}
+
+static void
+initialize_grilo (void)
+{
+  GError *error = NULL;
+  GrlRegistry *registry;
+
+  grl_init (NULL, NULL);
+  registry = grl_registry_get_default ();
+  configure_plugins ();
+
+  grl_registry_load_all_plugins (registry, &error);
+  g_assert_no_error (error);
+}
+
+
 gboolean
 ges_init (void)
 {
@@ -29,5 +58,6 @@ ges_init (void)
 
   nle_init_ghostpad_category ();
 
+  initialize_grilo ();
   return TRUE;
 }

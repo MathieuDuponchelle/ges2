@@ -1,7 +1,7 @@
 ges = shared_library('ges',
 		     'ges.c', 'ges-clip.c', 'ges-timeline.c', 'ges-enums.c', 'ges-playable.c', 'ges-composition-bin.c', 'ges-object.c', 'ges-transition.c', 'ges-uri-clip.c', 'ges-test-clip.c',
 		     install: true,
-		     dependencies: [glib_dep, gobject_dep, gst_dep, gst_player_dep, gst_controller_dep],
+		     dependencies: [glib_dep, gobject_dep, gst_dep, gst_player_dep, gst_controller_dep, grilo_dep],
 		     c_args: ['-Wno-pedantic'],
 		     include_directories: inc,
 		     link_with: [nle]

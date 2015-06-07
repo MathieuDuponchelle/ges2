@@ -9,6 +9,7 @@ gst_dep = dependency('gstreamer-1.0', version: '>= 1.5')
 gst_player_dep = dependency('gstreamer-player')
 gst_controller_dep = dependency('gstreamer-controller-1.0')
 gio_dep = dependency ('gio-2.0')
+grilo_dep = dependency ('grilo-0.2')
 
 inc = include_directories ('nle', 'ges')
 
