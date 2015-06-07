@@ -170,19 +170,38 @@ _parse_structures (const gchar * string)
 
 typedef gboolean (*StructuredFunction)(GESLauncher *self, const GstStructure *structure);
 
-static gboolean
-_add_clip (GESLauncher *self, const GstStructure *structure)
+static void
+_add_clip_for_media_type (GESLauncher *self, const GstStructure *structure, GESMediaType media_type)
 {
   GESLauncherPrivate *priv = GES_LAUNCHER_PRIV (self);
   const gchar *uri = gst_structure_get_string (structure, "uri");
+  GESClip *clip = ges_uri_clip_new (uri, media_type);
+  gdouble time;
 
-  GESClip *clip = ges_uri_clip_new (uri, GES_MEDIA_TYPE_VIDEO);
-  g_object_set (clip, "start", 0, "duration", 3 * GST_SECOND, "inpoint", 60 * GST_SECOND, NULL);
-  ges_timeline_add_object (priv->timeline, GES_OBJECT (clip));
+  if (!clip)
+    return;
 
-  clip = ges_uri_clip_new (uri, GES_MEDIA_TYPE_AUDIO);
-  g_object_set (clip, "start", 0, "duration", 3 * GST_SECOND, "inpoint", 60 * GST_SECOND, NULL);
+  if (gst_structure_get_double (structure, "inpoint", &time)) {
+    GST_ERROR ("setting inpoint dude");
+    ges_object_set_inpoint (GES_OBJECT (clip), time * GST_SECOND);
+  }
+
+  if (gst_structure_get_double (structure, "start", &time)) {
+    ges_object_set_start (GES_OBJECT (clip), time * GST_SECOND);
+  }
+
+  if (gst_structure_get_double (structure, "duration", &time)) {
+    ges_object_set_duration (GES_OBJECT (clip), time * GST_SECOND);
+  }
+
   ges_timeline_add_object (priv->timeline, GES_OBJECT (clip));
+}
+
+static gboolean
+_add_clip (GESLauncher *self, const GstStructure *structure)
+{
+  _add_clip_for_media_type (self, structure, GES_MEDIA_TYPE_VIDEO);
+  _add_clip_for_media_type (self, structure, GES_MEDIA_TYPE_AUDIO);
 
   return TRUE;
 }
@@ -245,6 +264,12 @@ _on_eos_cb (GstPlayer *player, GESLauncher *launcher)
   g_idle_add ((GSourceFunc) _release, launcher);
 }
 
+static void
+_position_cb (GstPlayer *player, GstClockTime position, GESLauncher *self)
+{
+  g_print ("\rposition is now %" GST_TIME_FORMAT, GST_TIME_ARGS (position));
+}
+
 static gboolean
 _run_pipeline (GESLauncher * self)
 {
@@ -254,6 +279,7 @@ _run_pipeline (GESLauncher * self)
   player = ges_playable_make_player (GES_PLAYABLE (priv->timeline));
   g_signal_connect (player, "error", G_CALLBACK (_on_error_cb), self);
   g_signal_connect (player, "end-of-stream", G_CALLBACK (_on_eos_cb), self);
+  g_signal_connect (player, "position-updated", G_CALLBACK (_position_cb), self);
   gst_player_play (player);
 
   g_application_hold (G_APPLICATION (self));
