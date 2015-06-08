@@ -39,7 +39,7 @@ introspection_sources = ['ges.c',
 	   'ges-test-clip.c',
 	   'ges-test-clip.h']
 
-gnome.generate_gir(ges,
+girtargets = gnome.generate_gir(ges,
   sources : introspection_sources,
   nsversion : '2.0',
   namespace : 'GES',
@@ -50,3 +50,4 @@ gnome.generate_gir(ges,
   dependencies: [gst_player_dep],
   install : true
 )
+
