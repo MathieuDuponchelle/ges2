@@ -20,7 +20,7 @@ ges_playable_default_init (GESPlayableInterface * iface)
  * Note that as this function will remove @playable from any container
  * it was in (such as a #GESTimeline). This means you can't both play
  * it and its containing timeline, disposing of the #GstPlayer will
- * put back @playable in its original container OK ?? you better be.
+ * put back @playable in its original container OK ?? you better be right.
  *
  * Returns: (transfer full): The newly created #GstPlayer.
  */
