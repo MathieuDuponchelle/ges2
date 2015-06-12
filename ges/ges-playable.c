@@ -3,6 +3,14 @@
 G_DEFINE_INTERFACE (GESPlayable, ges_playable,
     G_TYPE_OBJECT);
 
+/**
+ * SECTION: gesplayable
+ * @short_description: Interface that playable objects can
+ * implement to allow the user to play it with a #GstPlayer
+ *
+ * You will love playable !
+ */
+
 static void
 ges_playable_default_init (GESPlayableInterface * iface)
 {
@@ -20,7 +28,7 @@ ges_playable_default_init (GESPlayableInterface * iface)
  * Note that as this function will remove @playable from any container
  * it was in (such as a #GESTimeline). This means you can't both play
  * it and its containing timeline, disposing of the #GstPlayer will
- * put back @playable in its original container OK ?? you better be right.
+ * put back @playable in its original container OK ?? you better be dead right.
  *
  * Returns: (transfer full): The newly created #GstPlayer.
  */

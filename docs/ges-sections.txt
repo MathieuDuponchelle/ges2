@@ -7,14 +7,9 @@
     </SYMBOLS>
   </SECTION>
   <SECTION>
-    <FILE>ges-clip</FILE>
-    <TITLE>GESClip</TITLE>
+    <TITLE>Introduction</TITLE>
     <SYMBOLS>
-      <SYMBOL>GESClip</SYMBOL>
-      <SYMBOL>GESClipClass</SYMBOL>
-      <SYMBOL>ges_clip_get_transition</SYMBOL>
-      <SYMBOL>ges_clip_set_transition</SYMBOL>
-    </SYMBOLS>
+  </SYMBOLS>
   </SECTION>
   <SECTION>
     <FILE>ges-object</FILE>
@@ -22,18 +17,18 @@
     <SYMBOLS>
       <SYMBOL>GESObject</SYMBOL>
       <SYMBOL>GESObjectClass</SYMBOL>
-      <SYMBOL>ges_object_get_duration</SYMBOL>
-      <SYMBOL>ges_object_get_inpoint</SYMBOL>
-      <SYMBOL>ges_object_get_interpolation_control_source</SYMBOL>
-      <SYMBOL>ges_object_get_media_type</SYMBOL>
-      <SYMBOL>ges_object_get_nle_objects</SYMBOL>
-      <SYMBOL>ges_object_get_start</SYMBOL>
-      <SYMBOL>ges_object_get_track_index</SYMBOL>
-      <SYMBOL>ges_object_set_duration</SYMBOL>
-      <SYMBOL>ges_object_set_inpoint</SYMBOL>
-      <SYMBOL>ges_object_set_media_type</SYMBOL>
       <SYMBOL>ges_object_set_start</SYMBOL>
+      <SYMBOL>ges_object_get_start</SYMBOL>
+      <SYMBOL>ges_object_set_duration</SYMBOL>
+      <SYMBOL>ges_object_get_duration</SYMBOL>
+      <SYMBOL>ges_object_set_inpoint</SYMBOL>
+      <SYMBOL>ges_object_get_inpoint</SYMBOL>
       <SYMBOL>ges_object_set_track_index</SYMBOL>
+      <SYMBOL>ges_object_get_track_index</SYMBOL>
+      <SYMBOL>ges_object_set_media_type</SYMBOL>
+      <SYMBOL>ges_object_get_media_type</SYMBOL>
+      <SYMBOL>ges_object_get_interpolation_control_source</SYMBOL>
+      <SYMBOL>ges_object_get_nle_objects</SYMBOL>
     </SYMBOLS>
   </SECTION>
   <SECTION>
@@ -42,8 +37,28 @@
     <SYMBOLS>
       <SYMBOL>GESPlayable</SYMBOL>
       <SYMBOL>GESPlayableInterface</SYMBOL>
-      <SYMBOL>ges_playable_make_playable</SYMBOL>
       <SYMBOL>ges_playable_make_player</SYMBOL>
+      <SYMBOL>ges_playable_make_playable</SYMBOL>
+    </SYMBOLS>
+  </SECTION>
+  <SECTION>
+    <FILE>ges-clip</FILE>
+    <TITLE>GESClip</TITLE>
+    <SYMBOLS>
+      <SYMBOL>GESClip</SYMBOL>
+      <SYMBOL>GESClipClass</SYMBOL>
+      <SYMBOL>ges_clip_set_transition</SYMBOL>
+      <SYMBOL>ges_clip_get_transition</SYMBOL>
+    </SYMBOLS>
+  </SECTION>
+  <SECTION>
+    <FILE>ges-uri-clip</FILE>
+    <TITLE>GESUriClip</TITLE>
+    <SYMBOLS>
+      <SYMBOL>GESUriClip</SYMBOL>
+      <SYMBOL>GESUriClipClass</SYMBOL>
+      <SYMBOL>ges_uri_clip_new</SYMBOL>
+      <SYMBOL>ges_uri_clip_set_uri</SYMBOL>
     </SYMBOLS>
   </SECTION>
   <SECTION>
@@ -61,20 +76,10 @@
     <SYMBOLS>
       <SYMBOL>GESTimeline</SYMBOL>
       <SYMBOL>GESTimelineClass</SYMBOL>
+      <SYMBOL>ges_timeline_new</SYMBOL>
       <SYMBOL>ges_timeline_add_object</SYMBOL>
       <SYMBOL>ges_timeline_commit</SYMBOL>
       <SYMBOL>ges_timeline_get_compositions_by_media_type</SYMBOL>
-      <SYMBOL>ges_timeline_new</SYMBOL>
-    </SYMBOLS>
-  </SECTION>
-  <SECTION>
-    <FILE>ges-uri-clip</FILE>
-    <TITLE>GESUriClip</TITLE>
-    <SYMBOLS>
-      <SYMBOL>GESUriClip</SYMBOL>
-      <SYMBOL>GESUriClipClass</SYMBOL>
-      <SYMBOL>ges_uri_clip_set_uri</SYMBOL>
-      <SYMBOL>ges_uri_clip_new</SYMBOL>
     </SYMBOLS>
   </SECTION>
   <SECTION>
@@ -83,9 +88,9 @@
     <SYMBOLS>
       <SYMBOL>GESTransition</SYMBOL>
       <SYMBOL>GESTransitionClass</SYMBOL>
+      <SYMBOL>ges_transition_new</SYMBOL>
       <SYMBOL>ges_transition_reset</SYMBOL>
       <SYMBOL>ges_transition_update</SYMBOL>
-      <SYMBOL>ges_transition_new</SYMBOL>
     </SYMBOLS>
   </SECTION>
 </SECTIONS>

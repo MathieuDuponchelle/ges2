@@ -2,6 +2,12 @@
 #include "ges.h"
 #include "nle.h"
   
+/**
+ * SECTION: Introduction
+ *
+ * {{ introduction.markdown }}
+ */
+
 struct _elements_entry
 {
   const gchar *name;
