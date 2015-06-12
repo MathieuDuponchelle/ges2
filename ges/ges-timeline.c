@@ -5,6 +5,7 @@
 #include "ges-transition.h"
 #include "gst/controller/controller.h"
 #include "ges-clip.h"
+#include "ges-internal.h"
 
 /* Structure definitions */
 

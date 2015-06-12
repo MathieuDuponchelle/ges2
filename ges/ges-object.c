@@ -3,6 +3,19 @@
 
 #define GES_OBJECT_PRIV(self) (ges_object_get_instance_private (GES_OBJECT (self)))
 
+/**
+ * SECTION: gesobject
+ *
+ * #GESObject is the base class for all objects that can be edited.
+ *
+ * The properties it exposes are:
+ *
+ * - Timing properties such as start, inpoint and duration.
+ * - The type of the media contained in it.
+ * - #GstControlSources for all of its controllable properties,
+ *   to let you set keyframes on them.
+ */
+
 /* Structure definitions */
 
 typedef struct _GESObjectPrivate
@@ -24,128 +37,221 @@ G_DEFINE_TYPE_WITH_CODE (GESObject, ges_object, G_TYPE_INITIALLY_UNOWNED,
 
 /* API */
 
+/**
+ * ges_object_set_media_type:
+ * @object: a #GESObject
+ * @media_type: the new #GESMediaType
+ *
+ * Set the #GESObject:media-type of @object
+ *
+ * Note that not all subclasses of #GESObject support changing the media
+ * type after construction.
+ *
+ * Returns: %TRUE if @media_type could be set, %FALSE otherwise
+ */
 gboolean
-ges_object_set_media_type (GESObject *self, GESMediaType media_type)
+ges_object_set_media_type (GESObject *object, GESMediaType media_type)
 {
-  GESObjectPrivate *priv = GES_OBJECT_PRIV (self);
-  GESObjectClass *klass = GES_OBJECT_GET_CLASS (self);
+  GESObjectPrivate *priv = GES_OBJECT_PRIV (object);
+  GESObjectClass *klass = GES_OBJECT_GET_CLASS (object);
 
-  if (klass->set_media_type && klass->set_media_type (self, media_type)) {
+  if (klass->set_media_type && klass->set_media_type (object, media_type)) {
     priv->media_type = media_type;
     return TRUE;
   } else
-    GST_ERROR_OBJECT (self, "could not set media type to %d, check your code", media_type);
+    GST_ERROR_OBJECT (object, "could not set media type to %d, check your code", media_type);
 
   return FALSE;
 }
 
+/**
+ * ges_object_set_inpoint:
+ * @object: a #GESObject
+ * @inpoint: the new inpoint in nanoseconds
+ *
+ * Set the #GESObject:inpoint of @object
+ *
+ * Returns: %TRUE if @inpoint could be set, %FALSE otherwise
+ */
 gboolean
-ges_object_set_inpoint (GESObject *self, GstClockTime inpoint)
+ges_object_set_inpoint (GESObject *object, GstClockTime inpoint)
 {
-  GESObjectPrivate *priv = GES_OBJECT_PRIV (self);
-  GESObjectClass *klass = GES_OBJECT_GET_CLASS (self);
+  GESObjectPrivate *priv = GES_OBJECT_PRIV (object);
+  GESObjectClass *klass = GES_OBJECT_GET_CLASS (object);
 
-  if (klass->set_inpoint && klass->set_inpoint (self, inpoint)) {
+  if (klass->set_inpoint && klass->set_inpoint (object, inpoint)) {
     priv->inpoint = inpoint;
     return TRUE;
   } else
-    GST_ERROR_OBJECT (self, "could not set inpoint to %" GST_TIME_FORMAT, GST_TIME_ARGS (inpoint));
+    GST_ERROR_OBJECT (object, "could not set inpoint to %" GST_TIME_FORMAT, GST_TIME_ARGS (inpoint));
 
   return FALSE;
 }
 
+/**
+ * ges_object_set_duration:
+ * @object: a #GESObject
+ * @duration: the new duration in nanoseconds
+ *
+ * Set the #GESObject:duration of @object
+ *
+ * Returns: %TRUE if @duration could be set, %FALSE otherwise
+ */
 gboolean
-ges_object_set_duration (GESObject *self, GstClockTime duration)
+ges_object_set_duration (GESObject *object, GstClockTime duration)
 {
-  GESObjectPrivate *priv = GES_OBJECT_PRIV (self);
-  GESObjectClass *klass = GES_OBJECT_GET_CLASS (self);
+  GESObjectPrivate *priv = GES_OBJECT_PRIV (object);
+  GESObjectClass *klass = GES_OBJECT_GET_CLASS (object);
 
-  if (klass->set_duration && klass->set_duration (self, duration)) {
+  if (klass->set_duration && klass->set_duration (object, duration)) {
     priv->duration = duration;
     return TRUE;
   } else
-    GST_ERROR_OBJECT (self, "could not set duration to %" GST_TIME_FORMAT, GST_TIME_ARGS (duration));
+    GST_ERROR_OBJECT (object, "could not set duration to %" GST_TIME_FORMAT, GST_TIME_ARGS (duration));
 
   return FALSE;
 }
 
+/**
+ * ges_object_set_start:
+ * @object: a #GESObject
+ * @inpoint: the new start in nanoseconds
+ *
+ * Set the #GESObject:start of @object
+ *
+ * Returns: %TRUE if @start could be set, %FALSE otherwise
+ */
 gboolean
-ges_object_set_start (GESObject *self, GstClockTime start)
+ges_object_set_start (GESObject *object, GstClockTime start)
 {
-  GESObjectPrivate *priv = GES_OBJECT_PRIV (self);
-  GESObjectClass *klass = GES_OBJECT_GET_CLASS (self);
+  GESObjectPrivate *priv = GES_OBJECT_PRIV (object);
+  GESObjectClass *klass = GES_OBJECT_GET_CLASS (object);
 
-  if (klass->set_start && klass->set_start (self, start)) {
+  if (klass->set_start && klass->set_start (object, start)) {
     priv->start = start;
     return TRUE;
   } else
-    GST_ERROR_OBJECT (self, "could not set start to %" GST_TIME_FORMAT, GST_TIME_ARGS (start));
+    GST_ERROR_OBJECT (object, "could not set start to %" GST_TIME_FORMAT, GST_TIME_ARGS (start));
 
   return FALSE;
 }
 
+/**
+ * ges_object_set_track_index:
+ * @object: a #GESObject
+ * @media_type: If @object supports multiple #GESMediaTypes you can specify
+ * for which types you want to set @track_index. For example with a #GESTimeline
+ * containing audio and video, you can specify GES_MEDIA_TYPE_VIDEO to set the
+ * track-index only for the video. Specifying GES_MEDIA_TYPE_UNKNOWN means that
+ * you want to set the same track-index for all the supported #GESMediaTypes
+ * @track_index: The new track index.
+ *
+ * Set the #GESObject:track-index of @object.
+ *
+ * Returns: %TRUE if @track_index could be set, %FALSE otherwise
+ */
 gboolean
-ges_object_set_track_index (GESObject *self, GESMediaType media_type, guint track_index)
+ges_object_set_track_index (GESObject *object, GESMediaType media_type, guint track_index)
 {
-  GESObjectPrivate *priv = GES_OBJECT_PRIV (self);
-  GESObjectClass *klass = GES_OBJECT_GET_CLASS (self);
+  GESObjectPrivate *priv = GES_OBJECT_PRIV (object);
+  GESObjectClass *klass = GES_OBJECT_GET_CLASS (object);
 
-  if (klass->set_track_index && klass->set_track_index (self, media_type, track_index)) {
+  if (klass->set_track_index && klass->set_track_index (object, media_type, track_index)) {
     priv->track_index = track_index;
     return TRUE;
   } else
-    GST_ERROR_OBJECT (self, "could not set track index to %d", track_index);
+    GST_ERROR_OBJECT (object, "could not set track index to %d", track_index);
 
   return FALSE;
 }
 
+/**
+ * ges_object_get_media_type:
+ * @object: a #GESObject
+ *
+ * Get the #GESObject:media-type of @object
+ *
+ * Returns: The #GESMediaType of @object
+ */
 GESMediaType
-ges_object_get_media_type (GESObject *self)
+ges_object_get_media_type (GESObject *object)
 {
-  GESObjectPrivate *priv = GES_OBJECT_PRIV (self);
+  GESObjectPrivate *priv = GES_OBJECT_PRIV (object);
 
   return priv->media_type;
 }
 
+/**
+ * ges_object_get_inpoint:
+ * @object: a #GESObject
+ *
+ * Get the #GESObject:inpoint of @object
+ *
+ * Returns: The inpoint of @object
+ */
 GstClockTime
-ges_object_get_inpoint (GESObject *self)
+ges_object_get_inpoint (GESObject *object)
 {
-  GESObjectPrivate *priv = GES_OBJECT_PRIV (self);
+  GESObjectPrivate *priv = GES_OBJECT_PRIV (object);
 
   return priv->inpoint;
 }
 
+/**
+ * ges_object_get_start:
+ * @object: a #GESObject
+ *
+ * Get the #GESObject:start of @object
+ *
+ * Returns: The start of @object
+ */
 GstClockTime
-ges_object_get_start (GESObject *self)
+ges_object_get_start (GESObject *object)
 {
-  GESObjectPrivate *priv = GES_OBJECT_PRIV (self);
+  GESObjectPrivate *priv = GES_OBJECT_PRIV (object);
 
   return priv->start;
 }
 
+/**
+ * ges_object_get_duration:
+ * @object: a #GESObject
+ *
+ * Get the #GESObject:duration of @object
+ *
+ * Returns: The duration of @object
+ */
 GstClockTime
-ges_object_get_duration (GESObject *self)
+ges_object_get_duration (GESObject *object)
 {
-  GESObjectPrivate *priv = GES_OBJECT_PRIV (self);
+  GESObjectPrivate *priv = GES_OBJECT_PRIV (object);
 
   return priv->duration;
 }
 
+/**
+ * ges_object_get_track_index:
+ * @object: a #GESObject
+ *
+ * Get the #GESObject:track-index of @object for the given @media_type
+ *
+ * Returns: The track-index of @object for the given @media_type
+ */
 guint
-ges_object_get_track_index (GESObject *self, GESMediaType media_type)
+ges_object_get_track_index (GESObject *object, GESMediaType media_type)
 {
-  GESObjectPrivate *priv = GES_OBJECT_PRIV (self);
+  GESObjectPrivate *priv = GES_OBJECT_PRIV (object);
 
   return priv->track_index;
 }
 
 GList *
-ges_object_get_nle_objects (GESObject *self)
+ges_object_get_nle_objects (GESObject *object)
 {
-  GESObjectClass *klass = GES_OBJECT_GET_CLASS (self);
+  GESObjectClass *klass = GES_OBJECT_GET_CLASS (object);
 
   if (klass->get_nle_objects)
-    return klass->get_nle_objects (self);
+    return klass->get_nle_objects (object);
 
   return NULL;
 }
@@ -203,6 +309,19 @@ _lookup_element_for_property (GESObject *self, const gchar *property_name, GPara
   return object;
 }
 
+/**
+ * ges_object_get_interpolation_control_source:
+ * @object: a #GESObject
+ * @property_name: The name of the property to control, see the documentation
+ * of #GstChildProxy for more information on the naming scheme.
+ * @binding_type: The #GType of #GstControlBinding to create, G_TYPE_NONE will
+ * create a direct control binding.
+ *
+ * Get a #GstControlSource to control the property specified with @name, if
+ * it one already exists it will be returned.
+ *
+ * Returns: a #GstControlSource if one existed or could be created.
+ */
 GstControlSource *
 ges_object_get_interpolation_control_source (GESObject * self,
     const gchar * property_name, GType binding_type)
@@ -387,22 +506,63 @@ ges_object_class_init (GESObjectClass *klass)
   g_object_class->get_property = _get_property;
   g_object_class->dispose = _dispose;
 
-  g_object_class_install_property (g_object_class, PROP_MEDIA_TYPE,
-      g_param_spec_flags ("media-type", "Media Type", "The GESMediaType of the object", GES_TYPE_MEDIA_TYPE,
-          GES_MEDIA_TYPE_UNKNOWN, G_PARAM_READWRITE | G_PARAM_CONSTRUCT));
-
+  /**
+   * GESObject:inpoint:
+   *
+   * Given a media, the point in media-time in nanoseconds at which the object
+   * will start outputting data from that media. Do not confuse with #GESObject:start
+   */
   g_object_class_install_property (g_object_class, PROP_INPOINT,
       g_param_spec_uint64 ("inpoint", "Inpoint", "The inpoint of the object", 0, G_MAXUINT64,
           0, G_PARAM_READWRITE));
 
+  /**
+   * GESObject:duration:
+   *
+   * Given a media, the amount of data in nanoseconds the object will output from it.
+   */
   g_object_class_install_property (g_object_class, PROP_DURATION,
       g_param_spec_uint64 ("duration", "Duration", "The duration of the object", 0, G_MAXUINT64,
           0, G_PARAM_READWRITE));
 
+  /**
+   * GESObject:start:
+   *
+   * This property has no effect when the object is not in a #GESTimeline.
+   * When in a timeline, it represents the time in nanoseconds at which it will start
+   * outputting data. For example if the object is put in an empty audio timeline
+   * and set a start of 5 seconds, when playing the timeline silence will be
+   * output for 5 seconds, then the contents of the object.
+   */
   g_object_class_install_property (g_object_class, PROP_START,
       g_param_spec_uint64 ("start", "Start", "The start of the object", 0, G_MAXUINT64,
           0, G_PARAM_READWRITE));
 
+  /**
+   * GESObject:media-type:
+   *
+   * The type of media contained in the #GESObject, it can be a single
+   * #GESMediaType, or a combination of #GESMediaType.
+   */
+  g_object_class_install_property (g_object_class, PROP_MEDIA_TYPE,
+      g_param_spec_flags ("media-type", "Media Type", "The GESMediaType of the object",
+        GES_TYPE_MEDIA_TYPE, GES_MEDIA_TYPE_UNKNOWN, G_PARAM_READWRITE | G_PARAM_CONSTRUCT));
+
+  /**
+   * GESObject:track-index:
+   *
+   * This property has no effect when the object is not in a #GESTimeline.
+   * When in a timeline, it is used to determine the track to which the
+   * object belongs, that is the order in which it will be mixed with other,
+   * overlapping objects belonging to different tracks.
+   *
+   * For example if two video objects with the same duration, start and size
+   * are put in a video timeline, only the object with the *lowest* track-index
+   * will be visible when playing that timeline.
+   *
+   * This property will also be used to determine if transitions have to be
+   * created between two objects.
+   */
   g_object_class_install_property (g_object_class, PROP_TRACK_INDEX,
       g_param_spec_uint ("track-index", "Track index", "The index of the containing track", 0, G_MAXUINT,
           0, G_PARAM_READWRITE));

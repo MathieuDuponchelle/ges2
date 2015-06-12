@@ -17,8 +17,6 @@
     <SYMBOLS>
       <SYMBOL>GESObject</SYMBOL>
       <SYMBOL>GESObjectClass</SYMBOL>
-      <SYMBOL>ges_object_set_start</SYMBOL>
-      <SYMBOL>ges_object_get_start</SYMBOL>
       <SYMBOL>ges_object_set_duration</SYMBOL>
       <SYMBOL>ges_object_get_duration</SYMBOL>
       <SYMBOL>ges_object_set_inpoint</SYMBOL>
@@ -27,8 +25,9 @@
       <SYMBOL>ges_object_get_track_index</SYMBOL>
       <SYMBOL>ges_object_set_media_type</SYMBOL>
       <SYMBOL>ges_object_get_media_type</SYMBOL>
+      <SYMBOL>ges_object_set_start</SYMBOL>
+      <SYMBOL>ges_object_get_start</SYMBOL>
       <SYMBOL>ges_object_get_interpolation_control_source</SYMBOL>
-      <SYMBOL>ges_object_get_nle_objects</SYMBOL>
     </SYMBOLS>
   </SECTION>
   <SECTION>
