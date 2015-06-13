@@ -25,6 +25,9 @@ ges_playable_make_player (GESPlayable *playable);
 GstBin *
 ges_playable_make_playable (GESPlayable *playable, gboolean is_playable);
 
+gboolean
+ges_playable_play (GESPlayable *playable);
+
 G_END_DECLS
 
 #endif

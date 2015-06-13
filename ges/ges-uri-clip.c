@@ -11,6 +11,7 @@
 typedef struct _GESUriClipPrivate
 {
   gchar *uri;
+  GstDiscovererInfo *info;
 } GESUriClipPrivate;
 
 struct _GESUriClip
@@ -98,6 +99,8 @@ ges_uri_clip_new (const gchar *uri, GESMediaType media_type)
   GrlMedia *media = grl_media_from_uri (uri);
   GstDiscovererInfo *info;
   GList *streams;
+  GESClip *res;
+  GESUriClipPrivate *priv;
 
   if (!media) {
     GST_WARNING ("We couldn't recognize this uri with grilo : %s, beware", uri);
@@ -125,7 +128,10 @@ ges_uri_clip_new (const gchar *uri, GESMediaType media_type)
 
   gst_discoverer_stream_info_list_free (streams);
 
-  GESClip *res = g_object_new (GES_TYPE_URI_CLIP, "uri", grl_media_get_url (media), "media-type", media_type, NULL);
+  res = g_object_new (GES_TYPE_URI_CLIP, "uri", grl_media_get_url (media), "media-type", media_type, NULL);
+
+  priv = GES_URI_CLIP_PRIV (res);
+  priv->info = info;
   GST_DEBUG_OBJECT (res, "Actual media uri : %s", grl_media_get_url (media));
   g_object_set (res, "duration", gst_discoverer_info_get_duration (info), NULL);
 
@@ -160,6 +166,50 @@ _make_element (GESClip *clip)
   gst_caps_unref (caps);
 
   return decodebin;
+}
+
+static gboolean
+_set_inpoint (GESObject *object, GstClockTime inpoint)
+{
+  GESUriClipPrivate *priv = GES_URI_CLIP_PRIV (object);
+  GstClockTime media_duration;
+
+  if (!priv->info)
+    goto chain_up;
+
+  media_duration = gst_discoverer_info_get_duration (priv->info);
+
+  if (inpoint >= media_duration) {
+    GST_WARNING_OBJECT (object, "Cannot set an inpoint superior to the media duration");
+    return FALSE;
+  }
+
+  if (inpoint + ges_object_get_duration (object) > media_duration)
+    ges_object_set_duration (object, media_duration - inpoint);
+
+chain_up:
+  return GES_OBJECT_CLASS (ges_uri_clip_parent_class)->set_inpoint (object, inpoint);
+}
+
+static gboolean
+_set_duration (GESObject *object, GstClockTime duration)
+{
+  GESUriClipPrivate *priv = GES_URI_CLIP_PRIV (object);
+  GstClockTime media_duration;
+
+  if (!priv->info)
+    goto chain_up;
+
+  media_duration = gst_discoverer_info_get_duration (priv->info);
+
+  if (ges_object_get_inpoint (object) + duration > media_duration) {
+    GST_WARNING_OBJECT (object, "Cannot set a duration which, added to the"
+        "inpoint, would be superior to the media duration");
+    return FALSE;
+  }
+
+chain_up:
+  return GES_OBJECT_CLASS (ges_uri_clip_parent_class)->set_duration (object, duration);
 }
 
 /* GObject initialization */
@@ -216,6 +266,7 @@ ges_uri_clip_class_init (GESUriClipClass *klass)
 {
   GObjectClass *g_object_class = G_OBJECT_CLASS (klass);
   GESClipClass *clip_class = GES_CLIP_CLASS (klass);
+  GESObjectClass *ges_object_class = GES_OBJECT_CLASS (klass);
 
   g_object_class->set_property = _set_property;
   g_object_class->get_property = _get_property;
@@ -225,6 +276,8 @@ ges_uri_clip_class_init (GESUriClipClass *klass)
       g_param_spec_string ("uri", "URI", "uri of the resource", NULL,
           G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 
+  ges_object_class->set_duration = _set_duration;
+  ges_object_class->set_inpoint = _set_inpoint;
   clip_class->make_element = _make_element;
 }
 
@@ -234,4 +287,5 @@ ges_uri_clip_init (GESUriClip *self)
   GESUriClipPrivate *priv = GES_URI_CLIP_PRIV (self);
 
   priv->uri = NULL;
+  priv->info = NULL;
 }

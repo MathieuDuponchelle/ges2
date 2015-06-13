@@ -1,5 +1,7 @@
 sections_file = '@0@/@1@'.format(meson.current_source_dir(), 'ges-sections.txt')
 
+examples = '@0@/@1@'.format(meson.current_source_dir(), '../examples')
+example_doc = '@0@/@1@'.format(meson.current_source_dir(), 'example_docs')
 handwritten_doc = '@0@/@1@'.format(meson.current_source_dir(), 'handwritten')
 
 c_doc_pages = gnome.generate_doc_from_gir(girtargets,
@@ -8,7 +10,7 @@ c_doc_pages = gnome.generate_doc_from_gir(girtargets,
 					  link_to_gtk_doc: true,
 					  online_links : true,
 					  sections_file : sections_file,
-					  markdown_includes : [handwritten_doc],
+					  markdown_includes : [handwritten_doc, example_doc, examples],
 					  language : 'C'
 				         )
 
@@ -18,7 +20,7 @@ python_doc_pages = gnome.generate_doc_from_gir(girtargets,
 					       link_to_gtk_doc: true,
 					       online_links : true,
 					       sections_file : sections_file,
-					       markdown_includes : [handwritten_doc],
+					       markdown_includes : [handwritten_doc, example_doc, examples],
 					       language : 'python'
 				              )
 

@@ -45,6 +45,39 @@ ges_playable_make_player (GESPlayable * playable)
   return player;
 }
 
+static void
+_on_error_cb (GstPlayer *player, GError *error, GMainLoop *loop)
+{
+  gst_debug_bin_to_dot_file_with_ts (GST_BIN (gst_player_get_pipeline (player)), GST_DEBUG_GRAPH_SHOW_ALL, "plopthat");
+
+  g_main_loop_quit (loop);
+}
+
+static void
+_on_eos_cb (GstPlayer *player, GMainLoop *loop)
+{
+  g_main_loop_quit (loop);
+}
+
+gboolean
+ges_playable_play (GESPlayable *playable)
+{
+  GstPlayer *player;
+  GMainLoop *loop = g_main_loop_new (NULL, FALSE);
+
+  player = ges_playable_make_player (playable);
+  g_signal_connect (player, "error", G_CALLBACK (_on_error_cb), loop);
+  g_signal_connect (player, "end-of-stream", G_CALLBACK (_on_eos_cb), loop);
+  gst_player_play (player);
+
+  g_main_loop_run (loop);
+  g_main_loop_unref (loop);
+
+  g_object_unref (player);
+
+  return TRUE;
+}
+
 GstBin *
 ges_playable_make_playable (GESPlayable *playable, gboolean is_playable)
 {

@@ -71,6 +71,8 @@ ges_object_set_media_type (GESObject *object, GESMediaType media_type)
  *
  * Set the #GESObject:inpoint of @object
  *
+ * {{ object_set_inpoint.markdown }}
+ *
  * Returns: %TRUE if @inpoint could be set, %FALSE otherwise
  */
 gboolean
