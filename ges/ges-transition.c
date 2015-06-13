@@ -35,6 +35,7 @@ ges_transition_update (GESTransition *self)
 {
   GstTimedValueControlSource *source;
   GstClockTime transition_start, transition_stop, duration;
+  gdouble val;
 
   if (!self->priv->fadeout_clip || !self->priv->fadein_clip)
     return;
@@ -47,6 +48,11 @@ ges_transition_update (GESTransition *self)
   transition_stop = ges_object_get_inpoint (self->priv->fadeout_clip) +
     ges_object_get_duration (self->priv->fadeout_clip);
   duration = transition_stop - transition_start;
+
+  if (!gst_control_source_get_value (self->priv->fadeout_control_source,
+        ges_object_get_inpoint(self->priv->fadeout_clip), &val))
+    gst_timed_value_control_source_set (source,
+        ges_object_get_inpoint(self->priv->fadeout_clip), 1.0);
 
   gst_timed_value_control_source_set (source, transition_start, 1.0);
   gst_timed_value_control_source_set (source, transition_stop, 0.0);
