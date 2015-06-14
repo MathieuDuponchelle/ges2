@@ -31,6 +31,7 @@ typedef struct
   GSequence *objects_by_start;
   GESObject *prev;
   GESTimeline *timeline;
+  guint current_zorder;
 } GESTrack;
 
 enum
@@ -182,9 +183,9 @@ _make_nle_objects (GESTimeline *self, GESMediaType media_type)
 
   if (media_type & GES_MEDIA_TYPE_VIDEO) {
     GstElement *background = gst_parse_bin_from_description (
-        "videotestsrc ! framepositioner name=background_video_positioner", TRUE, NULL);
+        "videotestsrc pattern=checkers-8 ! framepositioner name=background_video_positioner", TRUE, NULL);
     GstElement *pos = gst_bin_get_by_name (GST_BIN (background), "background_video_positioner");
-    g_object_set (pos, "alpha", 0.0, "zorder", 10000, NULL);
+    g_object_set (pos, "alpha", 0.0, "zorder", 0, NULL);
     gst_object_unref (pos);
     composition = _create_composition (self, GES_RAW_VIDEO_CAPS, "video-composition");
     _add_expandable_operation (composition, "smartvideomixer", 0, "timeline-videomixer");
@@ -210,6 +211,21 @@ _compare_starts (GESObject *object1, GESObject *object2, gpointer unused)
 }
 
 static void
+_remove_transition (GESTimeline *self, GESClip *clip)
+{
+  GESTransition *transition = ges_clip_get_transition (GES_CLIP (clip));
+  if (!transition)
+    return;
+
+  g_object_ref (transition);
+  ges_clip_set_transition (clip, NULL);
+  GST_ERROR_OBJECT (self, "removed a transition");
+  g_signal_emit (self, ges_timeline_signals[TRANSITION_REMOVED], 0,
+      transition);
+  g_object_unref (transition);
+}
+
+static void
 _create_or_update_transition (GESTimeline *self, GESObject *prev, GESObject *next)
 {
   GESTransition *transition = ges_clip_get_transition (GES_CLIP (prev));
@@ -218,6 +234,7 @@ _create_or_update_transition (GESTimeline *self, GESObject *prev, GESObject *nex
     transition = ges_transition_new (prev, next);
 
     ges_clip_set_transition (GES_CLIP (prev), transition);
+    GST_ERROR_OBJECT (self, "added a transition");
     g_signal_emit (self, ges_timeline_signals[TRANSITION_ADDED], 0,
         transition);
   } else {
@@ -226,13 +243,9 @@ _create_or_update_transition (GESTimeline *self, GESObject *prev, GESObject *nex
     g_object_get (transition, "faded-in-clip", &faded_in_clip, NULL);
 
     if (faded_in_clip != next)  {
-      g_object_ref (transition);
-      ges_clip_set_transition (GES_CLIP (prev), NULL);
-      g_signal_emit (self, ges_timeline_signals[TRANSITION_REMOVED], 0,
-          transition);
-      g_object_unref (transition);
-      transition = ges_transition_new (prev, next);
+      _remove_transition (self, GES_CLIP (prev));
 
+      transition = ges_transition_new (prev, next);
       ges_clip_set_transition (GES_CLIP (prev), transition);
       g_signal_emit (self, ges_timeline_signals[TRANSITION_ADDED], 0,
           transition);
@@ -244,8 +257,25 @@ _create_or_update_transition (GESTimeline *self, GESObject *prev, GESObject *nex
 }
 
 static void
+_set_zorder (GESObject *object, guint zorder)
+{
+  GObject *pos;
+  GParamSpec *pspec;
+  /* zorder don't mean a thing for audio */
+  if (ges_object_get_media_type (object) != GES_MEDIA_TYPE_VIDEO)
+    return;
+
+  gst_child_proxy_lookup (GST_CHILD_PROXY (object),
+        "framepositioner::alpha", &pos, &pspec);
+
+  g_object_set (pos, "zorder", zorder, NULL);
+}
+
+static void
 _check_transition (GESObject *object, GESTrack *track)
 {
+  track->current_zorder -= 1;
+  _set_zorder (object, track->current_zorder);
   if (!track->prev) {
     track->prev = object;
     return;
@@ -253,15 +283,7 @@ _check_transition (GESObject *object, GESTrack *track)
 
   /* We don't overlap */
   if (ges_object_get_start (track->prev) + ges_object_get_duration (track->prev) <= ges_object_get_start (object)) {
-    GESTransition *transition = ges_clip_get_transition (GES_CLIP (track->prev));
-
-    if (transition) {
-      g_object_ref (transition);
-      ges_clip_set_transition (GES_CLIP (track->prev), NULL);
-      g_signal_emit (track->timeline, ges_timeline_signals[TRANSITION_REMOVED], 0,
-          transition);
-      g_object_unref (transition);
-    }
+    _remove_transition (track->timeline, GES_CLIP (track->prev));
     track->prev = object;
     return;
   }
@@ -271,17 +293,23 @@ _check_transition (GESObject *object, GESTrack *track)
 }
 
 static void
-_update_transitions_for_track (GESTrack *track)
+_update_transitions_for_track (GESTrack *track, guint track_index)
 {
+  GST_ERROR ("updating transitions for one track");
+
   g_sequence_sort (track->objects_by_start, (GCompareDataFunc) _compare_starts, NULL);
   track->prev = NULL;
+  track->current_zorder = G_MAXUINT - (track_index * 10000) - 1;
   g_sequence_foreach (track->objects_by_start, (GFunc) _check_transition, track);
+  if (track->prev)
+    _remove_transition (track->timeline, GES_CLIP (track->prev));
 }
 
 static void
 _update_transitions_for_media_type (GESTimeline *self, GESMediaType media_type)
 {
   GList *tracks = g_hash_table_lookup (self->priv->tracks, GINT_TO_POINTER (media_type));
+  guint track_index = 0;
 
   if (!tracks)
     return;
@@ -289,7 +317,8 @@ _update_transitions_for_media_type (GESTimeline *self, GESMediaType media_type)
   for (; tracks; tracks = tracks->next) {
     GESTrack *track = (GESTrack *) tracks->data;
 
-    _update_transitions_for_track (track);
+    _update_transitions_for_track (track, track_index);
+    track_index += 1;
   }
 }
 
@@ -300,19 +329,59 @@ _update_transitions (GESTimeline *self)
   _update_transitions_for_media_type (self, GES_MEDIA_TYPE_AUDIO);
 }
 
+typedef struct
+{
+  GESTimeline *timeline;
+  GSequenceIter *iter;
+  gulong handler_id;
+} TrackIter;
+
+static void
+_add_object_to_track (GESTimeline *self, GESObject *object, GESMediaType media_type);
+
+static void
+_object_track_index_changed_cb (GESObject *object, GParamSpec *pspec, TrackIter *track_iter)
+{
+  g_signal_handler_disconnect (object, track_iter->handler_id);
+  g_sequence_remove (track_iter->iter);
+  _add_object_to_track (track_iter->timeline, object, ges_object_get_media_type (object));
+  g_slice_free (TrackIter, track_iter);
+}
+
 static void
 _add_object_to_track (GESTimeline *self, GESObject *object, GESMediaType media_type)
 {
   GList *tracks = g_hash_table_lookup (self->priv->tracks, GINT_TO_POINTER (media_type));
   GESTrack *track;
+  TrackIter *track_iter;
+  guint track_index;
+  guint i;
 
   g_assert (tracks != NULL);
 
-  track = (GESTrack *) g_list_nth_data (tracks, ges_object_get_track_index (object, media_type));
+  if (media_type == GES_MEDIA_TYPE_VIDEO) {
+    track_index = ges_object_get_video_track_index(object);
+  } else {
+    track_index = ges_object_get_audio_track_index(object);
+  }
 
-  g_assert (track != NULL);
+  for (i = g_list_length (tracks); i <= track_index; i++) {
+    _add_track (self, media_type);
+  }
 
-  g_sequence_insert_sorted (track->objects_by_start, object, (GCompareDataFunc) _compare_starts, NULL);
+  track = (GESTrack *) g_list_nth_data (tracks, track_index);
+
+  track_iter = g_slice_new (TrackIter);
+  track_iter->timeline = self;
+  track_iter->iter = g_sequence_insert_sorted (track->objects_by_start, object, (GCompareDataFunc) _compare_starts, NULL);
+
+  if (media_type == GES_MEDIA_TYPE_VIDEO) {
+    track_iter->handler_id = g_signal_connect (object, "notify::video-track-index",
+        G_CALLBACK (_object_track_index_changed_cb), track_iter);
+  } else {
+    track_iter->handler_id = g_signal_connect (object, "notify::video-track-index",
+        G_CALLBACK(_object_track_index_changed_cb), track_iter); 
+  }
 }
 
 /* GESObject implementation */

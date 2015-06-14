@@ -41,9 +41,9 @@ struct _GESObjectClass
    */
   gboolean (*set_start)       (GESObject *object, GstClockTime start);
   /**
-   * GESObjectClass::set_track_index:
+   * GESObjectClass::set_video_track_index:
    *
-   * Implement this method if your subclass supports changing its track index
+   * Implement this method if your subclass supports changing its video track index
    */
   gboolean (*set_track_index) (GESObject *object, GESMediaType media_type, guint track_index);
 
@@ -63,13 +63,15 @@ GESMediaType ges_object_get_media_type  (GESObject *object);
 GstClockTime ges_object_get_inpoint     (GESObject *object);
 GstClockTime ges_object_get_duration    (GESObject *object);
 GstClockTime ges_object_get_start       (GESObject *object);
-guint        ges_object_get_track_index (GESObject *object, GESMediaType media_type);
+guint        ges_object_get_video_track_index (GESObject *object);
+guint        ges_object_get_audio_track_index (GESObject *object);
 
 gboolean ges_object_set_media_type  (GESObject *object, GESMediaType media_type);
 gboolean ges_object_set_inpoint     (GESObject *object, GstClockTime inpoint);
 gboolean ges_object_set_duration    (GESObject *object, GstClockTime duration);
 gboolean ges_object_set_start       (GESObject *object, GstClockTime start);
-gboolean ges_object_set_track_index (GESObject *object, GESMediaType media_type, guint track_index);
+gboolean ges_object_set_video_track_index (GESObject *object, guint track_index);
+gboolean ges_object_set_audio_track_index (GESObject *object, guint track_index);
 
 GstControlSource *
 ges_object_get_interpolation_control_source (GESObject * object,

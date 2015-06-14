@@ -1,6 +1,11 @@
 Welcome to the Gstreamer-Editing-Services (GES) documentation.
 
-This is the API used under the hood by Pitivi, so anything possible in Pitivi's UI can be done with GES as well.
+GES is a C, GObject-based library for video and audio editing and composition, it is portable to all the major platforms.
+
+Playback, rendering and asset management are voluntarily left outside of its scope, as it has been designed to transparently interact with other specialized projects:
+
+- [GstPlayer](https://github.com/sdroege/gst-player) for playback
+- [Grilo](https://github.com/GNOME/grilo) for asset management
 
 This document's objective is to serve both as as an API reference and a step-by-step tutorial / guide. We will start with the basic concepts, illustrating them with examples in various languages, and by the end you should be able to write a non-linear video editing software for the platform of your choice.
 

@@ -24,7 +24,8 @@ typedef struct _GESObjectPrivate
   GstClockTime inpoint;
   GstClockTime duration;
   GstClockTime start;
-  guint track_index;
+  guint video_track_index;
+  guint audio_track_index;
   GList *children;
   GList *control_sources;
 } GESObjectPrivate;
@@ -34,6 +35,20 @@ static void ges_object_child_proxy_init (GstChildProxyInterface * iface);
 G_DEFINE_TYPE_WITH_CODE (GESObject, ges_object, G_TYPE_INITIALLY_UNOWNED,
     G_ADD_PRIVATE (GESObject)
     G_IMPLEMENT_INTERFACE (GST_TYPE_CHILD_PROXY, ges_object_child_proxy_init))
+
+enum
+{
+  PROP_0,
+  PROP_MEDIA_TYPE,
+  PROP_INPOINT,
+  PROP_DURATION,
+  PROP_START,
+  PROP_VIDEO_TRACK_INDEX,
+  PROP_AUDIO_TRACK_INDEX,
+  PROP_LAST,
+};
+
+static GParamSpec *properties[PROP_LAST];
 
 /* API */
 
@@ -71,7 +86,7 @@ ges_object_set_media_type (GESObject *object, GESMediaType media_type)
  *
  * Set the #GESObject:inpoint of @object
  *
- * {{ object_set_inpoint.markdown }}
+ * {{ set_object_inpoint.markdown }}
  *
  * Returns: %TRUE if @inpoint could be set, %FALSE otherwise
  */
@@ -96,6 +111,8 @@ ges_object_set_inpoint (GESObject *object, GstClockTime inpoint)
  * @duration: the new duration in nanoseconds
  *
  * Set the #GESObject:duration of @object
+ *
+ * {{ set_object_duration.markdown }}
  *
  * Returns: %TRUE if @duration could be set, %FALSE otherwise
  */
@@ -139,27 +156,50 @@ ges_object_set_start (GESObject *object, GstClockTime start)
 }
 
 /**
- * ges_object_set_track_index:
+ * ges_object_set_video_track_index:
  * @object: a #GESObject
- * @media_type: If @object supports multiple #GESMediaTypes you can specify
- * for which types you want to set @track_index. For example with a #GESTimeline
- * containing audio and video, you can specify GES_MEDIA_TYPE_VIDEO to set the
- * track-index only for the video. Specifying GES_MEDIA_TYPE_UNKNOWN means that
- * you want to set the same track-index for all the supported #GESMediaTypes
  * @track_index: The new track index.
  *
- * Set the #GESObject:track-index of @object.
+ * {{ set_object_video_track_index.markdown }}
+ *
+ * Set the #GESObject:video-track-index of @object.
  *
  * Returns: %TRUE if @track_index could be set, %FALSE otherwise
  */
 gboolean
-ges_object_set_track_index (GESObject *object, GESMediaType media_type, guint track_index)
+ges_object_set_video_track_index (GESObject *object, guint track_index)
 {
   GESObjectPrivate *priv = GES_OBJECT_PRIV (object);
   GESObjectClass *klass = GES_OBJECT_GET_CLASS (object);
 
-  if (klass->set_track_index && klass->set_track_index (object, media_type, track_index)) {
-    priv->track_index = track_index;
+  if (klass->set_track_index && klass->set_track_index (object, GES_MEDIA_TYPE_VIDEO, track_index)) {
+    priv->video_track_index = track_index;
+    g_object_notify_by_pspec(G_OBJECT (object), properties[PROP_VIDEO_TRACK_INDEX]);
+    return TRUE;
+  } else
+    GST_ERROR_OBJECT (object, "could not set track index to %d", track_index);
+
+  return FALSE;
+}
+
+/**
+ * ges_object_set_audio_track_index:
+ * @object: a #GESObject
+ * @track_index: The new track index.
+ *
+ * Set the #GESObject:audio-track-index of @object.
+ *
+ * Returns: %TRUE if @track_index could be set, %FALSE otherwise
+ */
+gboolean
+ges_object_set_audio_track_index (GESObject *object, guint track_index)
+{
+  GESObjectPrivate *priv = GES_OBJECT_PRIV (object);
+  GESObjectClass *klass = GES_OBJECT_GET_CLASS (object);
+
+  if (klass->set_track_index && klass->set_track_index (object, GES_MEDIA_TYPE_AUDIO, track_index)) {
+    priv->audio_track_index = track_index;
+    g_object_notify_by_pspec(G_OBJECT (object), properties[PROP_AUDIO_TRACK_INDEX]);
     return TRUE;
   } else
     GST_ERROR_OBJECT (object, "could not set track index to %d", track_index);
@@ -232,19 +272,35 @@ ges_object_get_duration (GESObject *object)
 }
 
 /**
- * ges_object_get_track_index:
+ * ges_object_get_video_track_index:
  * @object: a #GESObject
  *
- * Get the #GESObject:track-index of @object for the given @media_type
+ * Get the #GESObject:video-track-index of @object
  *
- * Returns: The track-index of @object for the given @media_type
+ * Returns: The video track index of @object
  */
 guint
-ges_object_get_track_index (GESObject *object, GESMediaType media_type)
+ges_object_get_video_track_index (GESObject *object)
 {
   GESObjectPrivate *priv = GES_OBJECT_PRIV (object);
 
-  return priv->track_index;
+  return priv->video_track_index;
+}
+
+/**
+ * ges_object_get_audio_track_index:
+ * @object: a #GESObject
+ *
+ * Get the #GESObject:audio-track-index of @object
+ *
+ * Returns: The audio track index of @object
+ */
+guint
+ges_object_get_audio_track_index (GESObject *object)
+{
+  GESObjectPrivate *priv = GES_OBJECT_PRIV (object);
+
+  return priv->audio_track_index;
 }
 
 GList *
@@ -432,16 +488,6 @@ ges_object_child_proxy_init (GstChildProxyInterface *iface)
 
 /* GObject initialization */
 
-enum
-{
-  PROP_0,
-  PROP_MEDIA_TYPE,
-  PROP_INPOINT,
-  PROP_DURATION,
-  PROP_START,
-  PROP_TRACK_INDEX,
-};
-
 static void
 _set_property (GObject * object, guint property_id,
     const GValue * value, GParamSpec * pspec)
@@ -514,18 +560,18 @@ ges_object_class_init (GESObjectClass *klass)
    * Given a media, the point in media-time in nanoseconds at which the object
    * will start outputting data from that media. Do not confuse with #GESObject:start
    */
-  g_object_class_install_property (g_object_class, PROP_INPOINT,
+  properties[PROP_INPOINT] = 
       g_param_spec_uint64 ("inpoint", "Inpoint", "The inpoint of the object", 0, G_MAXUINT64,
-          0, G_PARAM_READWRITE));
+          0, G_PARAM_READWRITE);
 
   /**
    * GESObject:duration:
    *
    * Given a media, the amount of data in nanoseconds the object will output from it.
    */
-  g_object_class_install_property (g_object_class, PROP_DURATION,
+  properties[PROP_DURATION] =
       g_param_spec_uint64 ("duration", "Duration", "The duration of the object", 0, G_MAXUINT64,
-          0, G_PARAM_READWRITE));
+          0, G_PARAM_READWRITE);
 
   /**
    * GESObject:start:
@@ -536,9 +582,9 @@ ges_object_class_init (GESObjectClass *klass)
    * and set a start of 5 seconds, when playing the timeline silence will be
    * output for 5 seconds, then the contents of the object.
    */
-  g_object_class_install_property (g_object_class, PROP_START,
+  properties[PROP_START] =
       g_param_spec_uint64 ("start", "Start", "The start of the object", 0, G_MAXUINT64,
-          0, G_PARAM_READWRITE));
+          0, G_PARAM_READWRITE);
 
   /**
    * GESObject:media-type:
@@ -546,15 +592,15 @@ ges_object_class_init (GESObjectClass *klass)
    * The type of media contained in the #GESObject, it can be a single
    * #GESMediaType, or a combination of #GESMediaType.
    */
-  g_object_class_install_property (g_object_class, PROP_MEDIA_TYPE,
+  properties[PROP_MEDIA_TYPE] =
       g_param_spec_flags ("media-type", "Media Type", "The GESMediaType of the object",
-        GES_TYPE_MEDIA_TYPE, GES_MEDIA_TYPE_UNKNOWN, G_PARAM_READWRITE | G_PARAM_CONSTRUCT));
+        GES_TYPE_MEDIA_TYPE, GES_MEDIA_TYPE_UNKNOWN, G_PARAM_READWRITE | G_PARAM_CONSTRUCT);
 
   /**
-   * GESObject:track-index:
+   * GESObject:video-track-index:
    *
    * This property has no effect when the object is not in a #GESTimeline.
-   * When in a timeline, it is used to determine the track to which the
+   * When in a timeline, it is used to determine the video track to which the
    * object belongs, that is the order in which it will be mixed with other,
    * overlapping objects belonging to different tracks.
    *
@@ -563,11 +609,28 @@ ges_object_class_init (GESObjectClass *klass)
    * will be visible when playing that timeline.
    *
    * This property will also be used to determine if transitions have to be
-   * created between two objects.
+   * created between two video objects.
    */
-  g_object_class_install_property (g_object_class, PROP_TRACK_INDEX,
-      g_param_spec_uint ("track-index", "Track index", "The index of the containing track", 0, G_MAXUINT,
-          0, G_PARAM_READWRITE));
+  properties[PROP_VIDEO_TRACK_INDEX] =
+      g_param_spec_uint ("video-track-index", "Video track index",
+        "The index of the containing video track", 0, G_MAXUINT,
+          0, G_PARAM_READWRITE);
+
+  /**
+   * GESObject:audio-track-index:
+   *
+   * This property has no effect when the object is not in a #GESTimeline.
+   *
+   * When in a timeline, it is used to determine the video track to which the
+   * object belongs, in order to determine if transitions have to be created
+   * between two audio objects.
+   */
+  properties[PROP_AUDIO_TRACK_INDEX] =
+      g_param_spec_uint ("audio-track-index", "Audio track index",
+        "The index of the containing audio track", 0, G_MAXUINT,
+          0, G_PARAM_READWRITE);
+
+  g_object_class_install_properties (g_object_class, PROP_LAST, properties);
 
   klass->set_media_type = NULL;
   klass->set_inpoint = NULL;

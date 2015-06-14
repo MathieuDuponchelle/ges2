@@ -28,6 +28,14 @@ ges_test_clip_set_pattern (GESTestClip *self, const gchar *pattern)
   priv->pattern = g_strdup (pattern);
 }
 
+/**
+ * ges_test_clip_new:
+ * @media_type: The #GESMediaType of the test clip to create
+ * @pattern: (allow-none): The pattern or wave to produce, see gst-inspect-1.0
+ * videotestsrc and gst-inspect-1.0 audiotestsrc for more info.
+ *
+ * Returns: A new #GESTestClip
+ */
 GESClip *
 ges_test_clip_new (GESMediaType media_type, const gchar *pattern)
 {
@@ -42,15 +50,37 @@ _make_element (GESClip *clip)
   GESMediaType media_type;
   GstElement *testsrc;
   g_object_get (clip, "media-type", &media_type, NULL);
+  GESTestClipPrivate *priv = GES_TEST_CLIP_PRIV (clip);
+  gchar *pattern_enum_name = NULL;
+  gchar *pattern_prop_name = NULL;
 
   if (media_type == GES_MEDIA_TYPE_VIDEO) {
+    pattern_enum_name = g_strdup ("GstVideoTestSrcPattern");
+    pattern_prop_name = g_strdup ("pattern");
     testsrc = gst_element_factory_make ("videotestsrc", NULL);
-    g_object_set (testsrc, "pattern", 0, NULL);
-  } else if (media_type == GES_MEDIA_TYPE_AUDIO)
+  } else if (media_type == GES_MEDIA_TYPE_AUDIO) {
+    pattern_enum_name = g_strdup ("GstAudioTestSrcWave");
+    pattern_prop_name = g_strdup ("wave");
     testsrc = gst_element_factory_make ("audiotestsrc", NULL);
-  else {
+  } else {
     GST_ERROR_OBJECT (clip, "media type not supported : %d", media_type);
     return NULL;
+  }
+
+  {
+    GType pattern_type = g_type_from_name (pattern_enum_name);
+    GEnumClass *klass = (GEnumClass *) g_type_class_ref (pattern_type);
+    GEnumValue *val;
+    guint pattern = 0;
+    if (priv->pattern) {
+      val = g_enum_get_value_by_nick (klass, priv->pattern);
+      if (val)
+        pattern = val->value;
+    }
+    g_object_set (testsrc, pattern_prop_name, pattern, NULL);
+    g_type_class_unref (klass);
+    g_free (pattern_enum_name);
+    g_free (pattern_prop_name);
   }
 
   return testsrc;

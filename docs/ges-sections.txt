@@ -21,8 +21,10 @@
       <SYMBOL>ges_object_get_duration</SYMBOL>
       <SYMBOL>ges_object_set_inpoint</SYMBOL>
       <SYMBOL>ges_object_get_inpoint</SYMBOL>
-      <SYMBOL>ges_object_set_track_index</SYMBOL>
-      <SYMBOL>ges_object_get_track_index</SYMBOL>
+      <SYMBOL>ges_object_set_audio_track_index</SYMBOL>
+      <SYMBOL>ges_object_get_audio_track_index</SYMBOL>
+      <SYMBOL>ges_object_set_video_track_index</SYMBOL>
+      <SYMBOL>ges_object_get_video_track_index</SYMBOL>
       <SYMBOL>ges_object_set_media_type</SYMBOL>
       <SYMBOL>ges_object_get_media_type</SYMBOL>
       <SYMBOL>ges_object_set_start</SYMBOL>

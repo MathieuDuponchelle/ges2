@@ -9,7 +9,6 @@ typedef struct _GESTransitionPrivate
   GESObject *fadein_clip;
   GstControlSource *fadeout_control_source;
   GstControlSource *fadein_control_source;
-  GstControlSource *zorder_control_source;
 } GESTransitionPrivate;
 
 struct _GESTransition
@@ -65,25 +64,11 @@ ges_transition_update (GESTransition *self)
   gst_timed_value_control_source_set (source, transition_start + duration, 1.0);
   gst_timed_value_control_source_set (source, ges_object_get_inpoint (self->priv->fadein_clip) +
       ges_object_get_duration (self->priv->fadein_clip), 1.0);
-
-  if (self->priv->zorder_control_source) {
-    source = GST_TIMED_VALUE_CONTROL_SOURCE (self->priv->zorder_control_source);
-    gst_timed_value_control_source_set (source, transition_start, 2. / 10000.);
-    gst_timed_value_control_source_set (source, transition_start + duration, 0.0);
-    gst_timed_value_control_source_set (source, ges_object_get_inpoint (self->priv->fadein_clip) +
-        ges_object_get_duration (self->priv->fadein_clip), 0.0);
-  }
 }
 
 static void
 _create_control_sources (GESTransition *self)
 {
-  if (ges_object_get_media_type (self->priv->fadein_clip) & GES_MEDIA_TYPE_VIDEO) {
-      self->priv->zorder_control_source =
-        ges_object_get_interpolation_control_source (GES_OBJECT (self->priv->fadein_clip),
-            "framepositioner::zorder", G_TYPE_NONE);
-  }
-
   if (ges_object_get_media_type (self->priv->fadeout_clip) & GES_MEDIA_TYPE_VIDEO) {
     self->priv->fadeout_control_source =
       ges_object_get_interpolation_control_source (GES_OBJECT (self->priv->fadeout_clip),
@@ -130,13 +115,6 @@ ges_transition_reset (GESTransition *self)
   gst_timed_value_control_source_set (source,
       ges_object_get_inpoint (GES_OBJECT (self->priv->fadein_clip)), 1.0);
   gst_timed_value_control_source_set (source, end, 1.0);
-
-  if (self->priv->zorder_control_source) {
-    source = GST_TIMED_VALUE_CONTROL_SOURCE (self->priv->zorder_control_source);
-    gst_timed_value_control_source_set (source,
-        ges_object_get_inpoint (GES_OBJECT (self->priv->fadein_clip)), 0.0);
-    gst_timed_value_control_source_set (source, end, 0.0);
-  }
 
   self->priv->fadein_clip = NULL;
   self->priv->fadeout_clip = NULL;
@@ -226,7 +204,6 @@ ges_transition_init (GESTransition *self)
   self->priv->fadeout_clip = NULL;
   self->priv->fadeout_control_source = NULL;
   self->priv->fadein_control_source = NULL;
-  self->priv->zorder_control_source = NULL;
 }
 
 GESTransition *
