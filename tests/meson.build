@@ -41,3 +41,11 @@ test ('test_tracks', test_tracks, valgrind_args:['--suppressions=../tests/gst.su
 						 '--leak-resolution=high',
 						 '-q',
 						 '--num-callers=20'])
+
+test_serializing = executable ('test_serializing',
+'test_serializing.c', 'test-utils.c',
+install: true,
+dependencies : [glib_dep, gst_dep, gobject_dep, gst_player_dep, gst_check_dep],
+include_directories: inc,
+link_with: [nle, ges],
+c_args: ['-Wno-pedantic'])

@@ -1,6 +1,7 @@
 #include <grilo.h>
 #include "ges.h"
 #include "nle.h"
+#include "ges-internal.h"
   
 /**
  * SECTION: Introduction
@@ -66,4 +67,18 @@ ges_init (void)
 
   initialize_grilo ();
   return TRUE;
+}
+
+const gchar *
+_maybe_get_string_from_tuple (GVariant * tuple, guint index)
+{
+  const gchar *ret = NULL;
+  GVariant *maybe;
+  GET_FROM_TUPLE (tuple, maybe, index, &maybe);
+  if (maybe) {
+    ret = g_variant_get_string (maybe, NULL);
+    g_variant_unref (maybe);
+  }
+
+  return ret;
 }

@@ -3,6 +3,7 @@
 
 #include "ges-timeline.h"
 #include "ges-uri-source.h"
+#include "ges-internal.h"
 
 /* Structure definitions */
 
@@ -11,6 +12,8 @@
 typedef struct _GESUriSourcePrivate
 {
   gchar *uri;
+  gchar *original_uri;
+  GstElement *decodebin;
   GstDiscovererInfo *info;
 } GESUriSourcePrivate;
 
@@ -106,7 +109,7 @@ ges_uri_source_new (const gchar *uri, GESMediaType media_type)
     GST_WARNING ("We couldn't recognize this uri with grilo : %s, beware", uri);
     /* We still return a source, the user might have its own asset management
      * tools, but he will need to set the duration himself */
-    return g_object_new (GES_TYPE_URI_SOURCE, "uri", grl_media_get_url (media), "media-type", media_type, NULL);
+    return g_object_new (GES_TYPE_URI_SOURCE, "uri", uri, "media-type", media_type, NULL);
   }
 
   info = _get_discoverer_info_from_grl_media (media);
@@ -132,6 +135,7 @@ ges_uri_source_new (const gchar *uri, GESMediaType media_type)
 
   priv = GES_URI_SOURCE_PRIV (res);
   priv->info = info;
+  priv->original_uri = g_strdup (uri);
   GST_DEBUG_OBJECT (res, "Actual media uri : %s", grl_media_get_url (media));
   g_object_set (res, "duration", gst_discoverer_info_get_duration (info), NULL);
 
@@ -142,7 +146,6 @@ static GstElement *
 _make_element (GESSource *source)
 {
   GESMediaType media_type;
-  GstElement *decodebin;
   GstCaps *caps;
   GESUriSourcePrivate *priv = GES_URI_SOURCE_PRIV (source);
   g_object_get (source, "media-type", &media_type, NULL);
@@ -156,16 +159,16 @@ _make_element (GESSource *source)
     return NULL;
   }
 
-  decodebin = gst_element_factory_make ("uridecodebin", NULL);
-  g_object_set (decodebin, "caps", caps,
+  priv->decodebin = gst_element_factory_make ("uridecodebin", NULL);
+  g_object_set (priv->decodebin, "caps", caps,
       "expose-all-streams", FALSE, "uri", priv->uri, NULL);
 
   /* In case this is a remote source, we'll want to use download buffering and
    * have a large queue so nle can perform the switches peacefully */
-  g_object_set (decodebin, "use-buffering", FALSE, "download", TRUE, "buffer-size", 10 * 1024 * 1024, NULL);
+  g_object_set (priv->decodebin, "use-buffering", FALSE, "download", TRUE, "buffer-size", 10 * 1024 * 1024, NULL);
   gst_caps_unref (caps);
 
-  return decodebin;
+  return priv->decodebin;
 }
 
 static gboolean
@@ -210,6 +213,40 @@ _set_duration (GESObject *object, GstClockTime duration)
 
 chain_up:
   return GES_OBJECT_CLASS (ges_uri_source_parent_class)->set_duration (object, duration);
+}
+
+static GVariant *
+_serialize (GESObject *object)
+{
+  GESUriSourcePrivate *priv = GES_URI_SOURCE_PRIV (object);
+
+  if (priv->original_uri)
+    return g_variant_new ("(ms)", priv->original_uri);
+  return g_variant_new ("(ms)", priv->uri);
+}
+
+static gboolean
+_deserialize (GESObject *object, GVariant *variant)
+{
+  GESUriSourcePrivate *priv = GES_URI_SOURCE_PRIV (object);
+  GrlMedia *media;
+  gchar *uri;
+
+  uri = g_strdup (_maybe_get_string_from_tuple (variant, 0));
+  media = grl_media_from_uri (uri);
+
+  if (!media) {
+    return TRUE;
+  }
+
+  priv->info = _get_discoverer_info_from_grl_media (media);
+  priv->original_uri = uri;
+  priv->uri = g_strdup (grl_media_get_url (media));
+  g_object_set (object, "duration", gst_discoverer_info_get_duration (priv->info), NULL);
+  g_object_set (priv->decodebin, "uri", priv->uri, NULL);
+  GST_ERROR ("I've set uri to %s", priv->uri);
+
+  return TRUE;
 }
 
 /* GObject initialization */
@@ -278,6 +315,8 @@ ges_uri_source_class_init (GESUriSourceClass *klass)
 
   ges_object_class->set_duration = _set_duration;
   ges_object_class->set_inpoint = _set_inpoint;
+  ges_object_class->serialize = _serialize;
+  ges_object_class->deserialize = _deserialize;
   source_class->make_element = _make_element;
 }
 

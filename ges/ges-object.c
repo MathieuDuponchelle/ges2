@@ -1,5 +1,6 @@
 #include "gst/controller/controller.h"
 #include "ges-object.h"
+#include "ges-internal.h"
 
 #define GES_OBJECT_PRIV(self) (ges_object_get_instance_private (GES_OBJECT (self)))
 
@@ -205,6 +206,109 @@ ges_object_set_audio_track_index (GESObject *object, guint track_index)
     GST_ERROR_OBJECT (object, "could not set track index to %d", track_index);
 
   return FALSE;
+}
+
+static GVariant *
+_serialize_generic (GESObject *object)
+{
+  GVariant *ret;
+  GESObjectPrivate *priv = GES_OBJECT_PRIV (object);
+
+  ret = g_variant_new ("(sutttuu)",
+      g_type_name (G_TYPE_FROM_INSTANCE (object)),
+      priv->media_type,
+      priv->inpoint,
+      priv->duration,
+      priv->start,
+      priv->video_track_index,
+      priv->audio_track_index);
+
+  return ret;
+}
+
+static GVariant *
+_serialize_subclass (GESObject *object)
+{
+  GESObjectClass *klass = GES_OBJECT_GET_CLASS (object);
+
+  if (klass->serialize) {
+    return klass->serialize (object);
+  }
+
+  return NULL;
+}
+
+GVariant *
+ges_object_serialize (GESObject *object)
+{
+  GVariant *variant;
+  GVariant *wrapper;
+
+  variant = g_variant_new ("(vmv)", _serialize_generic (object), _serialize_subclass (object));
+  wrapper = g_variant_new_variant (variant);
+  return wrapper;
+}
+
+static GVariant *
+_maybe_get_variant_from_tuple (GVariant * tuple, guint index)
+{
+  GVariant *ret = NULL;
+  GVariant *maybe;
+  GET_FROM_TUPLE (tuple, maybe, index, &maybe);
+  if (maybe) {
+    ret = g_variant_get_variant (maybe);
+    g_variant_unref (maybe);
+  }
+
+  return ret;
+}
+
+static void
+_deserialize_generic (GESObject *object, GVariant *variant)
+{
+  guint64 inpoint;
+  guint64 duration;
+  guint64 start;
+  guint video_track_index;
+  guint audio_track_index;
+
+  GET_FROM_TUPLE (variant, uint64, 2, &inpoint);
+  GET_FROM_TUPLE (variant, uint64, 3, &duration);
+  GET_FROM_TUPLE (variant, uint64, 4, &start);
+  GET_FROM_TUPLE (variant, uint32, 5, &video_track_index);
+  GET_FROM_TUPLE (variant, uint32, 6, &audio_track_index);
+
+  g_object_set (object, "inpoint", inpoint, "duration", duration,
+      "start", start, NULL);
+  ges_object_set_video_track_index (object, video_track_index);
+  ges_object_set_audio_track_index (object, audio_track_index);
+}
+
+GESObject *
+ges_object_deserialize (GVariant *object_variant)
+{
+  GVariant *variant = g_variant_get_variant (object_variant);
+  GVariant *generic;
+  GVariant *subclass_variant;
+  GESObject *res;
+  const gchar *object_type_name;
+  GESMediaType media_type;
+  GESObjectClass *klass;
+
+  GET_FROM_TUPLE (variant, variant, 0, &generic);
+  GET_STRING_FROM_TUPLE (generic, 0, &object_type_name);
+  GET_FROM_TUPLE (generic, uint32, 1, &media_type);
+
+  res = g_object_new (g_type_from_name (object_type_name), "media-type", media_type, NULL);
+
+  subclass_variant = _maybe_get_variant_from_tuple (variant, 1);
+  klass = GES_OBJECT_GET_CLASS (res);
+  if (klass->deserialize)
+    klass->deserialize (res, subclass_variant);
+
+  _deserialize_generic (res, generic);
+
+  return res;
 }
 
 /**
@@ -637,6 +741,8 @@ ges_object_class_init (GESObjectClass *klass)
   klass->set_duration = NULL;
   klass->set_start = NULL;
   klass->set_track_index = NULL;
+  klass->serialize = NULL;
+  klass->deserialize = NULL;
 }
 
 static void

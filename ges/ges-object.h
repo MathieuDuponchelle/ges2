@@ -57,6 +57,9 @@ struct _GESObjectClass
    * virtual method
    */
   GList *  (*get_nle_objects) (GESObject *object);
+
+  GVariant * (*serialize) (GESObject *object);
+  gboolean   (*deserialize) (GESObject *object, GVariant *variant);
 };
 
 GESMediaType ges_object_get_media_type  (GESObject *object);
@@ -72,6 +75,9 @@ gboolean ges_object_set_duration    (GESObject *object, GstClockTime duration);
 gboolean ges_object_set_start       (GESObject *object, GstClockTime start);
 gboolean ges_object_set_video_track_index (GESObject *object, guint track_index);
 gboolean ges_object_set_audio_track_index (GESObject *object, guint track_index);
+
+GVariant *ges_object_serialize (GESObject *object);
+GESObject *ges_object_deserialize (GVariant *object_variant);
 
 GstControlSource *
 ges_object_get_interpolation_control_source (GESObject * object,

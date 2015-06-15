@@ -1,4 +1,5 @@
 #include "ges-test-source.h"
+#include "ges-internal.h"
 
 /* Structure definitions */
 
@@ -7,6 +8,7 @@
 typedef struct _GESTestSourcePrivate
 {
   gchar *pattern;
+  GstElement *testsrc;
 } GESTestSourcePrivate;
 
 struct _GESTestSource
@@ -44,46 +46,83 @@ ges_test_source_new (GESMediaType media_type, const gchar *pattern)
   return res;
 }
 
-static GstElement *
-_make_element (GESSource *source)
+static void
+_set_pattern (GESTestSource *source)
 {
-  GESMediaType media_type;
-  GstElement *testsrc;
-  g_object_get (source, "media-type", &media_type, NULL);
   GESTestSourcePrivate *priv = GES_TEST_SOURCE_PRIV (source);
   gchar *pattern_enum_name = NULL;
   gchar *pattern_prop_name = NULL;
+  GESMediaType media_type = ges_object_get_media_type (GES_OBJECT (source));
+  GType pattern_type;
+  GEnumClass *klass;
+  GEnumValue *val;
+  guint pattern = 0;
+
+  if (!priv->testsrc)
+    return;
 
   if (media_type == GES_MEDIA_TYPE_VIDEO) {
     pattern_enum_name = g_strdup ("GstVideoTestSrcPattern");
     pattern_prop_name = g_strdup ("pattern");
-    testsrc = gst_element_factory_make ("videotestsrc", NULL);
   } else if (media_type == GES_MEDIA_TYPE_AUDIO) {
     pattern_enum_name = g_strdup ("GstAudioTestSrcWave");
     pattern_prop_name = g_strdup ("wave");
-    testsrc = gst_element_factory_make ("audiotestsrc", NULL);
+  } else {
+    GST_ERROR_OBJECT (source, "media type not supported : %d", media_type);
+    return;
+  }
+
+  pattern_type = g_type_from_name (pattern_enum_name);
+  klass = (GEnumClass *) g_type_class_ref (pattern_type);
+  if (priv->pattern) {
+    val = g_enum_get_value_by_nick (klass, priv->pattern);
+    if (val)
+      pattern = val->value;
+  }
+
+  g_object_set (priv->testsrc, pattern_prop_name, pattern, NULL);
+  g_type_class_unref (klass);
+  g_free (pattern_enum_name);
+  g_free (pattern_prop_name);
+}
+
+static GstElement *
+_make_element (GESSource *source)
+{
+  GESMediaType media_type;
+  g_object_get (source, "media-type", &media_type, NULL);
+  GESTestSourcePrivate *priv = GES_TEST_SOURCE_PRIV (source);
+
+  if (media_type == GES_MEDIA_TYPE_VIDEO) {
+    priv->testsrc = gst_element_factory_make ("videotestsrc", NULL);
+  } else if (media_type == GES_MEDIA_TYPE_AUDIO) {
+    priv->testsrc = gst_element_factory_make ("audiotestsrc", NULL);
   } else {
     GST_ERROR_OBJECT (source, "media type not supported : %d", media_type);
     return NULL;
   }
 
-  {
-    GType pattern_type = g_type_from_name (pattern_enum_name);
-    GEnumClass *klass = (GEnumClass *) g_type_class_ref (pattern_type);
-    GEnumValue *val;
-    guint pattern = 0;
-    if (priv->pattern) {
-      val = g_enum_get_value_by_nick (klass, priv->pattern);
-      if (val)
-        pattern = val->value;
-    }
-    g_object_set (testsrc, pattern_prop_name, pattern, NULL);
-    g_type_class_unref (klass);
-    g_free (pattern_enum_name);
-    g_free (pattern_prop_name);
-  }
+  _set_pattern (GES_TEST_SOURCE (source));
+  return priv->testsrc;
+}
 
-  return testsrc;
+static GVariant *
+_serialize (GESObject *object)
+{
+  GESTestSourcePrivate *priv = GES_TEST_SOURCE_PRIV (object);
+
+  return g_variant_new ("(ms)", priv->pattern);
+}
+
+static gboolean
+_deserialize (GESObject *object, GVariant *variant)
+{
+  GESTestSourcePrivate *priv = GES_TEST_SOURCE_PRIV (object);
+
+  priv->pattern = g_strdup (_maybe_get_string_from_tuple (variant, 0));
+  _set_pattern (GES_TEST_SOURCE (object));
+
+  return TRUE;
 }
 
 /* GObject initialization */
@@ -140,6 +179,7 @@ ges_test_source_class_init (GESTestSourceClass *klass)
 {
   GObjectClass *g_object_class = G_OBJECT_CLASS (klass);
   GESSourceClass *source_class = GES_SOURCE_CLASS (klass);
+  GESObjectClass *ges_object_class = GES_OBJECT_CLASS (klass);
 
   g_object_class->set_property = _set_property;
   g_object_class->get_property = _get_property;
@@ -147,9 +187,11 @@ ges_test_source_class_init (GESTestSourceClass *klass)
 
   g_object_class_install_property (g_object_class, PROP_PATTERN,
       g_param_spec_string ("pattern", "Pattern", "pattern of the resource", NULL,
-          G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+          G_PARAM_READWRITE));
 
   source_class->make_element = _make_element;
+  ges_object_class->serialize = _serialize;
+  ges_object_class->deserialize = _deserialize;
 }
 
 static void
