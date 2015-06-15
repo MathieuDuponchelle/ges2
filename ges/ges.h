@@ -5,9 +5,9 @@
 #include <ges-object.h>
 #include <ges-playable.h>
 #include <ges-timeline.h>
-#include <ges-clip.h>
-#include <ges-uri-clip.h>
-#include <ges-test-clip.h>
+#include <ges-source.h>
+#include <ges-uri-source.h>
+#include <ges-test-source.h>
 
 G_BEGIN_DECLS
 

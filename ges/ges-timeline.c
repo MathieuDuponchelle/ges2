@@ -4,7 +4,7 @@
 #include "nle.h"
 #include "ges-transition.h"
 #include "gst/controller/controller.h"
-#include "ges-clip.h"
+#include "ges-source.h"
 #include "ges-internal.h"
 
 /* Structure definitions */
@@ -211,14 +211,14 @@ _compare_starts (GESObject *object1, GESObject *object2, gpointer unused)
 }
 
 static void
-_remove_transition (GESTimeline *self, GESClip *clip)
+_remove_transition (GESTimeline *self, GESSource *source)
 {
-  GESTransition *transition = ges_clip_get_transition (GES_CLIP (clip));
+  GESTransition *transition = ges_source_get_transition (GES_SOURCE (source));
   if (!transition)
     return;
 
   g_object_ref (transition);
-  ges_clip_set_transition (clip, NULL);
+  ges_source_set_transition (source, NULL);
   GST_ERROR_OBJECT (self, "removed a transition");
   g_signal_emit (self, ges_timeline_signals[TRANSITION_REMOVED], 0,
       transition);
@@ -228,31 +228,31 @@ _remove_transition (GESTimeline *self, GESClip *clip)
 static void
 _create_or_update_transition (GESTimeline *self, GESObject *prev, GESObject *next)
 {
-  GESTransition *transition = ges_clip_get_transition (GES_CLIP (prev));
+  GESTransition *transition = ges_source_get_transition (GES_SOURCE (prev));
 
   if (!transition) {
     transition = ges_transition_new (prev, next);
 
-    ges_clip_set_transition (GES_CLIP (prev), transition);
+    ges_source_set_transition (GES_SOURCE (prev), transition);
     GST_ERROR_OBJECT (self, "added a transition");
     g_signal_emit (self, ges_timeline_signals[TRANSITION_ADDED], 0,
         transition);
   } else {
-    GESObject *faded_in_clip;
+    GESObject *faded_in_source;
 
-    g_object_get (transition, "faded-in-clip", &faded_in_clip, NULL);
+    g_object_get (transition, "faded-in-source", &faded_in_source, NULL);
 
-    if (faded_in_clip != next)  {
-      _remove_transition (self, GES_CLIP (prev));
+    if (faded_in_source != next)  {
+      _remove_transition (self, GES_SOURCE (prev));
 
       transition = ges_transition_new (prev, next);
-      ges_clip_set_transition (GES_CLIP (prev), transition);
+      ges_source_set_transition (GES_SOURCE (prev), transition);
       g_signal_emit (self, ges_timeline_signals[TRANSITION_ADDED], 0,
           transition);
     } else  {
       ges_transition_update (transition);
     }
-    g_object_unref (faded_in_clip);
+    g_object_unref (faded_in_source);
   }
 }
 
@@ -283,7 +283,7 @@ _check_transition (GESObject *object, GESTrack *track)
 
   /* We don't overlap */
   if (ges_object_get_start (track->prev) + ges_object_get_duration (track->prev) <= ges_object_get_start (object)) {
-    _remove_transition (track->timeline, GES_CLIP (track->prev));
+    _remove_transition (track->timeline, GES_SOURCE (track->prev));
     track->prev = object;
     return;
   }
@@ -302,7 +302,7 @@ _update_transitions_for_track (GESTrack *track, guint track_index)
   track->current_zorder = G_MAXUINT - (track_index * 10000) - 1;
   g_sequence_foreach (track->objects_by_start, (GFunc) _check_transition, track);
   if (track->prev)
-    _remove_transition (track->timeline, GES_CLIP (track->prev));
+    _remove_transition (track->timeline, GES_SOURCE (track->prev));
 }
 
 static void

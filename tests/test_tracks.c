@@ -18,8 +18,8 @@ _transition_removed_cb (GESTimeline *timeline, GESTransition *transition, guint 
 
 GST_START_TEST (test_tracks)
 {
-  GESClip *video_clip1 = ges_uri_clip_new ("file:///home/meh/Videos/homeland.mp4", GES_MEDIA_TYPE_AUDIO);
-  GESClip *video_clip2 = ges_uri_clip_new ("file:///home/meh/Music/waka.mp4", GES_MEDIA_TYPE_AUDIO);
+  GESSource *video_source1 = ges_uri_source_new ("file:///home/meh/Videos/homeland.mp4", GES_MEDIA_TYPE_AUDIO);
+  GESSource *video_source2 = ges_uri_source_new ("file:///home/meh/Music/waka.mp4", GES_MEDIA_TYPE_AUDIO);
   GESTimeline *timeline = ges_timeline_new(GES_MEDIA_TYPE_AUDIO);
   guint n_transitions = 0;
 
@@ -27,24 +27,24 @@ GST_START_TEST (test_tracks)
   g_signal_connect (timeline, "transition-removed", G_CALLBACK (_transition_removed_cb), &n_transitions);
 
   /* This will create a transition from 0.5 to 1 second */
-  ges_object_set_duration (GES_OBJECT (video_clip1), 25 * GST_SECOND);
-  ges_object_set_duration (GES_OBJECT (video_clip2), 25 * GST_SECOND);
+  ges_object_set_duration (GES_OBJECT (video_source1), 25 * GST_SECOND);
+  ges_object_set_duration (GES_OBJECT (video_source2), 25 * GST_SECOND);
 
-  ges_object_set_inpoint (GES_OBJECT (video_clip1), 60 * GST_SECOND);
-  ges_object_set_inpoint (GES_OBJECT (video_clip2), 150 * GST_SECOND);
+  ges_object_set_inpoint (GES_OBJECT (video_source1), 60 * GST_SECOND);
+  ges_object_set_inpoint (GES_OBJECT (video_source2), 150 * GST_SECOND);
 
-  ges_object_set_start (GES_OBJECT (video_clip1), 0 * GST_SECOND);
-  ges_object_set_start (GES_OBJECT (video_clip2), 2.5 * GST_SECOND);
+  ges_object_set_start (GES_OBJECT (video_source1), 0 * GST_SECOND);
+  ges_object_set_start (GES_OBJECT (video_source2), 2.5 * GST_SECOND);
 
-  ges_timeline_add_object (timeline, GES_OBJECT (video_clip1));
-  ges_timeline_add_object (timeline, GES_OBJECT (video_clip2));
+  ges_timeline_add_object (timeline, GES_OBJECT (video_source1));
+  ges_timeline_add_object (timeline, GES_OBJECT (video_source2));
 
   ges_timeline_commit (timeline);
   fail_unless_equals_int (n_transitions, 1);
   play_playable (GES_PLAYABLE (timeline));
 
   /* This will remove the transition altogether */
-  ges_object_set_start (GES_OBJECT (video_clip2), 1.5 * GST_SECOND);
+  ges_object_set_start (GES_OBJECT (video_source2), 1.5 * GST_SECOND);
   ges_timeline_commit (timeline);
   fail_unless_equals_int (n_transitions, 0);
 

@@ -1,15 +1,15 @@
 gnome = import ('gnome')
 
 sources = ['ges.c',
-	   'ges-clip.c',
+	   'ges-source.c',
 	   'ges-timeline.c',
 	   'ges-enums.c',
 	   'ges-playable.c',
 	   'ges-composition-bin.c',
 	   'ges-object.c',
 	   'ges-transition.c',
-	   'ges-uri-clip.c',
-	   'ges-test-clip.c']
+	   'ges-uri-source.c',
+	   'ges-test-source.c']
 
 ges = shared_library('ges',
 		     sources,
@@ -22,8 +22,8 @@ ges = shared_library('ges',
 
 introspection_sources = ['ges.c',
 	   'ges.h',
-	   'ges-clip.c',
-	   'ges-clip.h',
+	   'ges-source.c',
+	   'ges-source.h',
 	   'ges-timeline.c',
 	   'ges-timeline.h',
 	   'ges-enums.c',
@@ -34,10 +34,10 @@ introspection_sources = ['ges.c',
 	   'ges-object.h',
 	   'ges-transition.c',
 	   'ges-transition.h',
-	   'ges-uri-clip.c',
-	   'ges-uri-clip.h',
-	   'ges-test-clip.c',
-	   'ges-test-clip.h']
+	   'ges-uri-source.c',
+	   'ges-uri-source.h',
+	   'ges-test-source.c',
+	   'ges-test-source.h']
 
 girtargets = gnome.generate_gir(ges,
   sources : introspection_sources,

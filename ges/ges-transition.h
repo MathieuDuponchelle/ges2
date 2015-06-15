@@ -11,7 +11,7 @@ G_BEGIN_DECLS
 G_DECLARE_FINAL_TYPE(GESTransition, ges_transition, GES, TRANSITION, GObject)
 
 GESTransition *
-ges_transition_new (GESObject *fadeout_clip, GESObject *fadein_clip);
+ges_transition_new (GESObject *fadeout_source, GESObject *fadein_source);
 void ges_transition_reset (GESTransition *self);
 void ges_transition_update (GESTransition *self);
 

@@ -171,37 +171,37 @@ _parse_structures (const gchar * string)
 typedef gboolean (*StructuredFunction)(GESLauncher *self, const GstStructure *structure);
 
 static void
-_add_clip_for_media_type (GESLauncher *self, const GstStructure *structure, GESMediaType media_type)
+_add_source_for_media_type (GESLauncher *self, const GstStructure *structure, GESMediaType media_type)
 {
   GESLauncherPrivate *priv = GES_LAUNCHER_PRIV (self);
   const gchar *uri = gst_structure_get_string (structure, "uri");
-  GESClip *clip = ges_uri_clip_new (uri, media_type);
+  GESSource *source = ges_uri_source_new (uri, media_type);
   gdouble time;
 
-  if (!clip)
+  if (!source)
     return;
 
   if (gst_structure_get_double (structure, "inpoint", &time)) {
     GST_ERROR ("setting inpoint dude");
-    ges_object_set_inpoint (GES_OBJECT (clip), time * GST_SECOND);
+    ges_object_set_inpoint (GES_OBJECT (source), time * GST_SECOND);
   }
 
   if (gst_structure_get_double (structure, "start", &time)) {
-    ges_object_set_start (GES_OBJECT (clip), time * GST_SECOND);
+    ges_object_set_start (GES_OBJECT (source), time * GST_SECOND);
   }
 
   if (gst_structure_get_double (structure, "duration", &time)) {
-    ges_object_set_duration (GES_OBJECT (clip), time * GST_SECOND);
+    ges_object_set_duration (GES_OBJECT (source), time * GST_SECOND);
   }
 
-  ges_timeline_add_object (priv->timeline, GES_OBJECT (clip));
+  ges_timeline_add_object (priv->timeline, GES_OBJECT (source));
 }
 
 static gboolean
-_add_clip (GESLauncher *self, const GstStructure *structure)
+_add_source (GESLauncher *self, const GstStructure *structure)
 {
-  _add_clip_for_media_type (self, structure, GES_MEDIA_TYPE_VIDEO);
-  _add_clip_for_media_type (self, structure, GES_MEDIA_TYPE_AUDIO);
+  _add_source_for_media_type (self, structure, GES_MEDIA_TYPE_VIDEO);
+  _add_source_for_media_type (self, structure, GES_MEDIA_TYPE_AUDIO);
 
   return TRUE;
 }
@@ -458,7 +458,7 @@ _local_command_line (GApplication * application, gchar ** arguments[],
     {"set-scenario", 0, 0, G_OPTION_ARG_STRING, &opts->scenario,
           "ges-launch-1.0 exposes gst-validate functionalities, such as scenarios."
           " Scenarios describe actions to execute, such as seeks or setting of properties. "
-          "GES implements editing-specific actions such as adding or removing clips. "
+          "GES implements editing-specific actions such as adding or removing sources. "
           "See gst-validate-1.0 --help for more info about validate and scenarios, "
           "and --inspect-action-type.",
         "<scenario_name>"},
@@ -595,7 +595,7 @@ ges_launcher_init (GESLauncher * self)
   GESLauncherPrivate *priv = GES_LAUNCHER_PRIV (self);
 
   priv->function_map = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, NULL);
-  g_hash_table_insert (priv->function_map, g_strdup ("clip"), _add_clip);
+  g_hash_table_insert (priv->function_map, g_strdup ("source"), _add_source);
 }
 
 gint

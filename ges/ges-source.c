@@ -1,12 +1,12 @@
 #include "ges-timeline.h"
-#include "ges-clip.h"
+#include "ges-source.h"
 #include "ges-playable.h"
 
 /* Structure definitions */
 
-#define GES_CLIP_PRIV(self) (ges_clip_get_instance_private (GES_CLIP (self)))
+#define GES_SOURCE_PRIV(self) (ges_source_get_instance_private (GES_SOURCE (self)))
 
-typedef struct _GESClipPrivate
+typedef struct _GESSourcePrivate
 {
   GstElement *nleobject;
   GstObject *old_parent;
@@ -15,35 +15,35 @@ typedef struct _GESClipPrivate
   guint track_index;
   GstElement *playable_bin;
   GESTransition *transition;
-} GESClipPrivate;
+} GESSourcePrivate;
 
 static void ges_playable_interface_init (GESPlayableInterface * iface);
 
-G_DEFINE_TYPE_WITH_CODE (GESClip, ges_clip, GES_TYPE_OBJECT,
-    G_ADD_PRIVATE (GESClip)
+G_DEFINE_TYPE_WITH_CODE (GESSource, ges_source, GES_TYPE_OBJECT,
+    G_ADD_PRIVATE (GESSource)
     G_IMPLEMENT_INTERFACE (GES_TYPE_PLAYABLE, ges_playable_interface_init)
     )
 
 /* Implementation */
 
 static void
-_pad_added_cb (GstElement *element, GstPad *srcpad, GESClip *self)
+_pad_added_cb (GstElement *element, GstPad *srcpad, GESSource *self)
 {
-  GESClipPrivate *priv = GES_CLIP_PRIV (self);
+  GESSourcePrivate *priv = GES_SOURCE_PRIV (self);
   gst_element_no_more_pads (element);
   gst_pad_link (srcpad, priv->static_sinkpad);
 }
 
 static void
-_make_nle_object (GESClip *self)
+_make_nle_object (GESSource *self)
 {
-  GESClipPrivate *priv = GES_CLIP_PRIV (self);
+  GESSourcePrivate *priv = GES_SOURCE_PRIV (self);
   GstElement *element, *rate, *converter;
   GstElement *topbin;
   GstPad *srcpad, *ghost;
   GstCaps *caps;
   GESMediaType media_type;
-  GESClipClass *klass = GES_CLIP_GET_CLASS (self);
+  GESSourceClass *klass = GES_SOURCE_GET_CLASS (self);
 
   g_object_get (self, "media-type", &media_type, NULL);
 
@@ -109,10 +109,10 @@ _make_nle_object (GESClip *self)
 }
 
 static void
-_expose_nle_object (GESClip *self)
+_expose_nle_object (GESSource *self)
 {
   GstPad *pad;
-  GESClipPrivate *priv = GES_CLIP_PRIV (self);
+  GESSourcePrivate *priv = GES_SOURCE_PRIV (self);
 
   g_object_get (priv->nleobject, "composition", &priv->old_parent, NULL);
 
@@ -130,9 +130,9 @@ _expose_nle_object (GESClip *self)
 }
 
 static void
-_unexpose_nle_object (GESClip *self)
+_unexpose_nle_object (GESSource *self)
 {
-  GESClipPrivate *priv = GES_CLIP_PRIV (self);
+  GESSourcePrivate *priv = GES_SOURCE_PRIV (self);
 
   gst_ghost_pad_set_target (GST_GHOST_PAD (priv->ghostpad), NULL);
   gst_pad_set_active (GST_PAD (priv->ghostpad), FALSE);
@@ -153,8 +153,8 @@ _unexpose_nle_object (GESClip *self)
 static GstBin *
 _make_playable (GESPlayable *playable, gboolean is_playable)
 {
-  GESClip *self = GES_CLIP (playable);
-  GESClipPrivate *priv = GES_CLIP_PRIV (self);
+  GESSource *self = GES_SOURCE (playable);
+  GESSourcePrivate *priv = GES_SOURCE_PRIV (self);
 
   if (is_playable)
     _expose_nle_object (self);
@@ -173,9 +173,9 @@ ges_playable_interface_init (GESPlayableInterface * iface)
 /* API */
 
 gboolean
-ges_clip_set_transition (GESClip *self, GESTransition *transition)
+ges_source_set_transition (GESSource *self, GESTransition *transition)
 {
-  GESClipPrivate *priv = GES_CLIP_PRIV (self);
+  GESSourcePrivate *priv = GES_SOURCE_PRIV (self);
 
   if (priv->transition) {
     ges_transition_reset (priv->transition);
@@ -188,9 +188,9 @@ ges_clip_set_transition (GESClip *self, GESTransition *transition)
 }
 
 GESTransition *
-ges_clip_get_transition (GESClip *self)
+ges_source_get_transition (GESSource *self)
 {
-  GESClipPrivate *priv = GES_CLIP_PRIV (self);
+  GESSourcePrivate *priv = GES_SOURCE_PRIV (self);
   return priv->transition;
 }
 
@@ -199,7 +199,7 @@ ges_clip_get_transition (GESClip *self)
 static gboolean
 _set_inpoint (GESObject *object, GstClockTime inpoint)
 {
-  GESClipPrivate *priv = GES_CLIP_PRIV (object);
+  GESSourcePrivate *priv = GES_SOURCE_PRIV (object);
 
   g_object_set (priv->nleobject, "inpoint", inpoint, NULL);
 
@@ -209,7 +209,7 @@ _set_inpoint (GESObject *object, GstClockTime inpoint)
 static gboolean
 _set_duration (GESObject *object, GstClockTime duration)
 {
-  GESClipPrivate *priv = GES_CLIP_PRIV (object);
+  GESSourcePrivate *priv = GES_SOURCE_PRIV (object);
 
   g_object_set (priv->nleobject, "duration", duration, NULL);
 
@@ -219,7 +219,7 @@ _set_duration (GESObject *object, GstClockTime duration)
 static gboolean
 _set_start (GESObject *object, GstClockTime start)
 {
-  GESClipPrivate *priv = GES_CLIP_PRIV (object);
+  GESSourcePrivate *priv = GES_SOURCE_PRIV (object);
 
   g_object_set (priv->nleobject, "start", start, NULL);
 
@@ -229,7 +229,7 @@ _set_start (GESObject *object, GstClockTime start)
 static gboolean
 _set_media_type (GESObject *object, GESMediaType media_type)
 {
-  GESClipPrivate *priv = GES_CLIP_PRIV (object);
+  GESSourcePrivate *priv = GES_SOURCE_PRIV (object);
 
   if (priv->nleobject) {
     GST_ERROR_OBJECT (object, "changing media type isn't supported yet");
@@ -242,7 +242,7 @@ _set_media_type (GESObject *object, GESMediaType media_type)
 static GList *
 _get_nle_objects (GESObject *object)
 {
-  GESClipPrivate *priv = GES_CLIP_PRIV (object);
+  GESSourcePrivate *priv = GES_SOURCE_PRIV (object);
 
   return g_list_append (NULL, priv->nleobject);
 }
@@ -250,7 +250,7 @@ _get_nle_objects (GESObject *object)
 static gboolean
 _set_track_index (GESObject *object, GESMediaType media_type, guint index)
 {
-  GESClipPrivate *priv = GES_CLIP_PRIV (object);
+  GESSourcePrivate *priv = GES_SOURCE_PRIV (object);
   guint new_priority;
 
   if (!(media_type & ges_object_get_media_type (object)))
@@ -275,25 +275,25 @@ enum
 static void
 _dispose (GObject *object)
 {
-  GESClip *self = GES_CLIP (object);
-  GESClipPrivate *priv = GES_CLIP_PRIV (self);
+  GESSource *self = GES_SOURCE (object);
+  GESSourcePrivate *priv = GES_SOURCE_PRIV (self);
 
   if (priv->static_sinkpad)
     gst_object_unref (priv->static_sinkpad);
 
   gst_object_unref (priv->playable_bin);
-  G_OBJECT_CLASS (ges_clip_parent_class)->dispose (object);
+  G_OBJECT_CLASS (ges_source_parent_class)->dispose (object);
 }
 
 static void
 _constructed (GObject *object)
 {
-  _make_nle_object (GES_CLIP (object));
-  G_OBJECT_CLASS (ges_clip_parent_class)->constructed (object);
+  _make_nle_object (GES_SOURCE (object));
+  G_OBJECT_CLASS (ges_source_parent_class)->constructed (object);
 }
 
 static void
-ges_clip_class_init (GESClipClass *klass)
+ges_source_class_init (GESSourceClass *klass)
 {
   GObjectClass *g_object_class = G_OBJECT_CLASS (klass);
   GESObjectClass *ges_object_class = GES_OBJECT_CLASS (klass);
@@ -310,15 +310,15 @@ ges_clip_class_init (GESClipClass *klass)
 }
 
 static void
-ges_clip_init (GESClip *self)
+ges_source_init (GESSource *self)
 {
   gchar *padname;
-  GESClipPrivate *priv = GES_CLIP_PRIV (self);
+  GESSourcePrivate *priv = GES_SOURCE_PRIV (self);
 
   priv->old_parent = NULL;
   priv->playable_bin = gst_object_ref_sink (gst_bin_new (NULL));
   priv->transition = NULL;
-  padname = g_strdup_printf ("clip_%p_src", priv->nleobject);
+  padname = g_strdup_printf ("source_%p_src", priv->nleobject);
   priv->ghostpad = gst_ghost_pad_new_no_target (padname, GST_PAD_SRC);
   g_free (padname);
   gst_element_add_pad (GST_ELEMENT (priv->playable_bin), priv->ghostpad);

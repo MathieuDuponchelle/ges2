@@ -26,7 +26,7 @@ _print_all_commands (void)
 {
   /* Yeah I know very fancy */
   g_print ("Available ges-launch-1.0 commands:\n\n");
-  g_print ("  %-9s %-11s %-15s %-10s\n\n", "+clip", "+effect", "+test-clip",
+  g_print ("  %-9s %-11s %-15s %-10s\n\n", "+source", "+effect", "+test-source",
       "set-");
   g_print ("See ges-launch-1.0 help <command> or ges-launch-1.0 help <guide> "
       "to read about a specific command or a given guide\n");

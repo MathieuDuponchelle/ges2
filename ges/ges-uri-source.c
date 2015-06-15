@@ -2,33 +2,33 @@
 #include <gst/pbutils/gstdiscoverer.h>
 
 #include "ges-timeline.h"
-#include "ges-uri-clip.h"
+#include "ges-uri-source.h"
 
 /* Structure definitions */
 
-#define GES_URI_CLIP_PRIV(self) (ges_uri_clip_get_instance_private (GES_URI_CLIP (self)))
+#define GES_URI_SOURCE_PRIV(self) (ges_uri_source_get_instance_private (GES_URI_SOURCE (self)))
 
-typedef struct _GESUriClipPrivate
+typedef struct _GESUriSourcePrivate
 {
   gchar *uri;
   GstDiscovererInfo *info;
-} GESUriClipPrivate;
+} GESUriSourcePrivate;
 
-struct _GESUriClip
+struct _GESUriSource
 {
-  GESClip parent;
+  GESSource parent;
 };
 
-G_DEFINE_TYPE_WITH_CODE (GESUriClip, ges_uri_clip, GES_TYPE_CLIP,
-    G_ADD_PRIVATE (GESUriClip)
+G_DEFINE_TYPE_WITH_CODE (GESUriSource, ges_uri_source, GES_TYPE_SOURCE,
+    G_ADD_PRIVATE (GESUriSource)
     )
 
 /* Implementation */
 
 void
-ges_uri_clip_set_uri (GESUriClip *self, const gchar *uri)
+ges_uri_source_set_uri (GESUriSource *self, const gchar *uri)
 {
-  GESUriClipPrivate *priv = GES_URI_CLIP_PRIV (self);
+  GESUriSourcePrivate *priv = GES_URI_SOURCE_PRIV (self);
 
   if (priv->uri) {
     GST_ERROR_OBJECT (self, "changing uri is not supported yet");
@@ -93,20 +93,20 @@ _get_discoverer_info_from_grl_media (GrlMedia *media)
   return info;
 }
 
-GESClip *
-ges_uri_clip_new (const gchar *uri, GESMediaType media_type)
+GESSource *
+ges_uri_source_new (const gchar *uri, GESMediaType media_type)
 {
   GrlMedia *media = grl_media_from_uri (uri);
   GstDiscovererInfo *info;
   GList *streams;
-  GESClip *res;
-  GESUriClipPrivate *priv;
+  GESSource *res;
+  GESUriSourcePrivate *priv;
 
   if (!media) {
     GST_WARNING ("We couldn't recognize this uri with grilo : %s, beware", uri);
-    /* We still return a clip, the user might have its own asset management
+    /* We still return a source, the user might have its own asset management
      * tools, but he will need to set the duration himself */
-    return g_object_new (GES_TYPE_URI_CLIP, "uri", grl_media_get_url (media), "media-type", media_type, NULL);
+    return g_object_new (GES_TYPE_URI_SOURCE, "uri", grl_media_get_url (media), "media-type", media_type, NULL);
   }
 
   info = _get_discoverer_info_from_grl_media (media);
@@ -128,9 +128,9 @@ ges_uri_clip_new (const gchar *uri, GESMediaType media_type)
 
   gst_discoverer_stream_info_list_free (streams);
 
-  res = g_object_new (GES_TYPE_URI_CLIP, "uri", grl_media_get_url (media), "media-type", media_type, NULL);
+  res = g_object_new (GES_TYPE_URI_SOURCE, "uri", grl_media_get_url (media), "media-type", media_type, NULL);
 
-  priv = GES_URI_CLIP_PRIV (res);
+  priv = GES_URI_SOURCE_PRIV (res);
   priv->info = info;
   GST_DEBUG_OBJECT (res, "Actual media uri : %s", grl_media_get_url (media));
   g_object_set (res, "duration", gst_discoverer_info_get_duration (info), NULL);
@@ -139,20 +139,20 @@ ges_uri_clip_new (const gchar *uri, GESMediaType media_type)
 }
 
 static GstElement *
-_make_element (GESClip *clip)
+_make_element (GESSource *source)
 {
   GESMediaType media_type;
   GstElement *decodebin;
   GstCaps *caps;
-  GESUriClipPrivate *priv = GES_URI_CLIP_PRIV (clip);
-  g_object_get (clip, "media-type", &media_type, NULL);
+  GESUriSourcePrivate *priv = GES_URI_SOURCE_PRIV (source);
+  g_object_get (source, "media-type", &media_type, NULL);
 
   if (media_type == GES_MEDIA_TYPE_VIDEO)
     caps = gst_caps_from_string (GES_RAW_VIDEO_CAPS);
   else if (media_type == GES_MEDIA_TYPE_AUDIO)
     caps = gst_caps_from_string (GES_RAW_AUDIO_CAPS);
   else {
-    GST_ERROR_OBJECT (clip, "media type not supported : %d", media_type);
+    GST_ERROR_OBJECT (source, "media type not supported : %d", media_type);
     return NULL;
   }
 
@@ -171,7 +171,7 @@ _make_element (GESClip *clip)
 static gboolean
 _set_inpoint (GESObject *object, GstClockTime inpoint)
 {
-  GESUriClipPrivate *priv = GES_URI_CLIP_PRIV (object);
+  GESUriSourcePrivate *priv = GES_URI_SOURCE_PRIV (object);
   GstClockTime media_duration;
 
   if (!priv->info)
@@ -188,13 +188,13 @@ _set_inpoint (GESObject *object, GstClockTime inpoint)
     ges_object_set_duration (object, media_duration - inpoint);
 
 chain_up:
-  return GES_OBJECT_CLASS (ges_uri_clip_parent_class)->set_inpoint (object, inpoint);
+  return GES_OBJECT_CLASS (ges_uri_source_parent_class)->set_inpoint (object, inpoint);
 }
 
 static gboolean
 _set_duration (GESObject *object, GstClockTime duration)
 {
-  GESUriClipPrivate *priv = GES_URI_CLIP_PRIV (object);
+  GESUriSourcePrivate *priv = GES_URI_SOURCE_PRIV (object);
   GstClockTime media_duration;
 
   if (!priv->info)
@@ -209,7 +209,7 @@ _set_duration (GESObject *object, GstClockTime duration)
   }
 
 chain_up:
-  return GES_OBJECT_CLASS (ges_uri_clip_parent_class)->set_duration (object, duration);
+  return GES_OBJECT_CLASS (ges_uri_source_parent_class)->set_duration (object, duration);
 }
 
 /* GObject initialization */
@@ -224,11 +224,11 @@ static void
 _set_property (GObject * object, guint property_id,
     const GValue * value, GParamSpec * pspec)
 {
-  GESUriClip *self = GES_URI_CLIP (object);
+  GESUriSource *self = GES_URI_SOURCE (object);
 
   switch (property_id) {
     case PROP_URI:
-      ges_uri_clip_set_uri (self, g_value_get_string (value));
+      ges_uri_source_set_uri (self, g_value_get_string (value));
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
@@ -239,7 +239,7 @@ static void
 _get_property (GObject * object, guint property_id,
     GValue * value, GParamSpec * pspec)
 {
-  GESUriClipPrivate *priv = GES_URI_CLIP_PRIV (object);
+  GESUriSourcePrivate *priv = GES_URI_SOURCE_PRIV (object);
 
   switch (property_id) {
     case PROP_URI:
@@ -253,19 +253,19 @@ _get_property (GObject * object, guint property_id,
 static void
 _dispose (GObject *object)
 {
-  GESUriClipPrivate *priv = GES_URI_CLIP_PRIV (object);
+  GESUriSourcePrivate *priv = GES_URI_SOURCE_PRIV (object);
 
   if (priv->uri)
     g_free (priv->uri);
 
-  G_OBJECT_CLASS (ges_uri_clip_parent_class)->dispose (object);
+  G_OBJECT_CLASS (ges_uri_source_parent_class)->dispose (object);
 }
 
 static void
-ges_uri_clip_class_init (GESUriClipClass *klass)
+ges_uri_source_class_init (GESUriSourceClass *klass)
 {
   GObjectClass *g_object_class = G_OBJECT_CLASS (klass);
-  GESClipClass *clip_class = GES_CLIP_CLASS (klass);
+  GESSourceClass *source_class = GES_SOURCE_CLASS (klass);
   GESObjectClass *ges_object_class = GES_OBJECT_CLASS (klass);
 
   g_object_class->set_property = _set_property;
@@ -278,13 +278,13 @@ ges_uri_clip_class_init (GESUriClipClass *klass)
 
   ges_object_class->set_duration = _set_duration;
   ges_object_class->set_inpoint = _set_inpoint;
-  clip_class->make_element = _make_element;
+  source_class->make_element = _make_element;
 }
 
 static void
-ges_uri_clip_init (GESUriClip *self)
+ges_uri_source_init (GESUriSource *self)
 {
-  GESUriClipPrivate *priv = GES_URI_CLIP_PRIV (self);
+  GESUriSourcePrivate *priv = GES_URI_SOURCE_PRIV (self);
 
   priv->uri = NULL;
   priv->info = NULL;
