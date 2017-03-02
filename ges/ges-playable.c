@@ -35,7 +35,7 @@ ges_playable_default_init (GESPlayableInterface * iface)
 GstPlayer *
 ges_playable_make_player (GESPlayable * playable)
 {
-  GstPlayer *player = gst_player_new();
+  GstPlayer *player = gst_player_new(NULL, NULL);
   gchar *uri;
 
   uri = g_strdup_printf ("ges:///%p\n", (void *) playable);

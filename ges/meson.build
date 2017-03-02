@@ -14,7 +14,7 @@ sources = ['ges.c',
 ges = shared_library('ges',
 		     sources,
 		     install: true,
-		     dependencies: [glib_dep, gobject_dep, gst_dep, gst_player_dep, gst_controller_dep, grilo_dep],
+		     dependencies: [glib_dep, gobject_dep, gst_dep, gst_controller_dep, grilo_dep, gstplayer_dep],
 		     c_args: ['-Wno-pedantic'],
 		     include_directories: inc,
 		     link_with: [nle]
@@ -46,8 +46,8 @@ girtargets = gnome.generate_gir(ges,
   symbol_prefix : 'ges_',
   identifier_prefix : 'GES',
   export_packages : 'ges',
-  includes : ['GObject-2.0', 'Gst-1.0', 'GstPlayer-0.0'],
-  dependencies: [gst_player_dep],
+  includes : ['GObject-2.0', 'Gst-1.0', 'GstPlayer-1.0'],
+  dependencies: [gstplayer_dep],
   install : true
 )
 

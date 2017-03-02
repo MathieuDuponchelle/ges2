@@ -20,7 +20,7 @@
 
 #include "ges-structure-parser.h"
 
-#include <ges/ges.h>
+#include <ges.h>
 
 G_DEFINE_TYPE (GESStructureParser, ges_structure_parser, G_TYPE_OBJECT);
 

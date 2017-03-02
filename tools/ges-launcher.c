@@ -31,7 +31,7 @@
 #include "ges-launcher.h"
 #include "utils.h"
 #include "ges-structure-parser.h"
-#include "parse_lex.h"
+#include "parse.l.yy.h"
 
 #define GES_LAUNCHER_PRIV(self) (ges_launcher_get_instance_private (GES_LAUNCHER (self)))
 

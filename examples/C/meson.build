@@ -8,7 +8,7 @@ foreach ex : examples
 	executable(ex.get(0),
 	ex.get(1),
 	install: true,
-	dependencies : [glib_dep, gst_dep, gobject_dep, gst_player_dep],
+	dependencies : [glib_dep, gst_dep, gobject_dep, gstplayer_dep],
 	include_directories: inc,
 	link_with: [ges],
 	c_args: ['-Wno-pedantic']

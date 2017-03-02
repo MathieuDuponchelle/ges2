@@ -4,7 +4,7 @@
 
 int main (int ac, char **av)
 {
-  GstElement *pipeline, *nlesource, *pulsesrc, *fakesink, *composition, *convert, *resample;
+  GstElement *pipeline, *nlesource, *pulsesrc, *fakesink, *composition;
   GstElement *livesourcewrapper, *nlesource2, *testsrc;
   GMainLoop *loop = g_main_loop_new (NULL, FALSE);
   GstStateChangeReturn state_change;
@@ -20,8 +20,6 @@ int main (int ac, char **av)
   testsrc = gst_element_factory_make ("audiotestsrc", NULL);
   pipeline = gst_pipeline_new(NULL);
   fakesink = gst_element_factory_make ("autoaudiosink",  "fakesink");
-  convert = gst_element_factory_make ("audioconvert", NULL);
-  resample = gst_element_factory_make ("audioresample", NULL);
   livesourcewrapper = gst_element_factory_make ("livesourcewrapper", NULL);
 
   g_object_set (nlesource, "duration", 2 * GST_SECOND, NULL);
